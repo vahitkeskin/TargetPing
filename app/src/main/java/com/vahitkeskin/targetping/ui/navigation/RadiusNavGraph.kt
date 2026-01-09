@@ -6,7 +6,7 @@ import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.rememberNavController
 import androidx.navigation.toRoute
-import com.vahitkeskin.targetping.ui.features.add_edit.AddEditScreen
+import com.vahitkeskin.targetping.ui.home.AddEditScreen
 import com.vahitkeskin.targetping.ui.features.list.ListScreen
 import com.vahitkeskin.targetping.ui.features.map.MapScreen
 import com.vahitkeskin.targetping.ui.home.HomeViewModel

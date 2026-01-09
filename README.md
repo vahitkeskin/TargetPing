@@ -147,7 +147,8 @@ git clone [https://github.com/vahitkeskin/TargetPing.git](https://github.com/vah
 * Enable **Maps SDK for Android**.
 * Add your API key to `local.properties`:
 ```properties
-MAPS_API_KEY=AIzaSyD...
+
+MAPS_API_KEY=YOUR_GOOGLE_MAPS_API_KEY
 
 ```
 
