@@ -1,5 +1,5 @@
 <p align="center">
-  <img src="https://via.placeholder.com/150/00E5FF/000000?text=Target+Ping" alt="Target Ping Logo" width="120" height="120" style="border-radius: 20px;">
+  <img src="https://raw.githubusercontent.com/vahitkeskin/TargetPing/refs/heads/main/app/src/main/res/drawable/ic_target_ping_logo.png" alt="Target Ping Logo" width="150" height="150" style="border-radius: 28px;">
 </p>
 
 <h1 align="center">TARGET PING</h1>
@@ -17,7 +17,7 @@
 <p align="center">
   <img src="https://img.shields.io/badge/Min_SDK-24-success?style=flat-square">
   <img src="https://img.shields.io/badge/Target_SDK-34-success?style=flat-square">
-  <img src="https://img.shields.io/badge/License-MIT-orange?style=flat-square">
+  <img src="https://img.shields.io/badge/License-Educational-orange?style=flat-square">
   <img src="https://img.shields.io/badge/Build-Stable_v1.0-blueviolet?style=flat-square">
 </p>
 
