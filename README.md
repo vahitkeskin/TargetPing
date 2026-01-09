@@ -25,9 +25,13 @@
 
 ## 🛰️ Mission & Overview
 
-**Target Ping** is not just another GPS alarm; it is a **military-grade, precision tracking utility** engineered for Android. It enables users to define tactical perimeters (Geo-Fences) and receive high-priority alerts upon entry.
+**Target Ping** is not just another GPS alarm; it is a **military-grade, precision tracking utility
+** engineered for Android. It enables users to define tactical perimeters (Geo-Fences) and receive
+high-priority alerts upon entry.
 
-Unlike standard apps that rely on the unreliable Android Geofencing API, Target Ping utilizes a custom **Foreground Service Architecture** to ensure **100% reliability** in background operations, bypassing aggressive OEM battery optimizations.
+Unlike standard apps that rely on the unreliable Android Geofencing API, Target Ping utilizes a
+custom **Foreground Service Architecture** to ensure **100% reliability** in background operations,
+bypassing aggressive OEM battery optimizations.
 
 > *"Precision is not an option, it is the standard."*
 
@@ -35,30 +39,41 @@ Unlike standard apps that rely on the unreliable Android Geofencing API, Target 
 
 ## 📱 Tactical UI / UX Showcase
 
-The application features a **"Cyber Tactical"** design language, utilizing **Glassmorphism**, **Neon Accents**, and **Edge-to-Edge** transparency.
+The application features a **"Cyber Tactical"** design language, utilizing **Glassmorphism**, **Neon
+Accents**, and **Edge-to-Edge** transparency.
 
-| **Command Center (Map)** | **Surveillance List** | **Target Acquisition** |
-|:---:|:---:|:---:|
+|                                  **Command Center (Map)**                                   |                                    **Surveillance List**                                     |                                    **Target Acquisition**                                    |
+|:-------------------------------------------------------------------------------------------:|:--------------------------------------------------------------------------------------------:|:--------------------------------------------------------------------------------------------:|
 | <img src="https://via.placeholder.com/250x500/121212/00E5FF?text=Map+Screen" width="220" /> | <img src="https://via.placeholder.com/250x500/121212/00E5FF?text=List+Screen" width="220" /> | <img src="https://via.placeholder.com/250x500/121212/00E5FF?text=Edit+Screen" width="220" /> |
-| *Real-time Radar Pulse & HUD* | *Lite-Mode Map Snapshots* | *Precision Crosshair Targeting* |
+|                                *Real-time Radar Pulse & HUD*                                |                                  *Lite-Mode Map Snapshots*                                   |                               *Precision Crosshair Targeting*                                |
 
 ---
 
 ## ⚡ Key Features
 
 ### 🟢 Real-Time Background Intelligence
-* **Persistent Tracking:** Runs invisibly in the background using a **Foreground Service** with a persistent notification.
-* **Dead-Reckoning:** Continues to monitor location even when the app is killed from the recent apps list.
+
+* **Persistent Tracking:** Runs invisibly in the background using a **Foreground Service** with a
+  persistent notification.
+* **Dead-Reckoning:** Continues to monitor location even when the app is killed from the recent apps
+  list.
 
 ### 🎯 Precision Targeting
-* **Crosshair Logic:** Instead of dragging a pin, the map moves under a fixed crosshair for maximum accuracy.
-* **Live Radius:** Visual feedback changes instantly as you adjust the perimeter radius (e.g., 50m, 500m).
+
+* **Crosshair Logic:** Instead of dragging a pin, the map moves under a fixed crosshair for maximum
+  accuracy.
+* **Live Radius:** Visual feedback changes instantly as you adjust the perimeter radius (e.g., 50m,
+  500m).
 
 ### 🛡️ Privacy & Security
-* **Offline First:** All data is encrypted and stored locally using **Room Database**. No cloud uploads.
-* **Transparent:** The persistent notification ensures the user always knows when tracking is active.
+
+* **Offline First:** All data is encrypted and stored locally using **Room Database**. No cloud
+  uploads.
+* **Transparent:** The persistent notification ensures the user always knows when tracking is
+  active.
 
 ### 💎 Premium Experience
+
 * **Auto-Location:** Automatically zooms to the user's location on startup.
 * **Smart HUD:** Heads-Up Display showing GPS status and system arming state.
 * **Battery Optimized:** Uses adaptive intervals for `FusedLocationProvider` to save power.
@@ -67,7 +82,8 @@ The application features a **"Cyber Tactical"** design language, utilizing **Gla
 
 ## 🛠️ Technical Architecture (The Engine)
 
-This project strictly follows **Clean Architecture** principles, separating concerns into three distinct layers.
+This project strictly follows **Clean Architecture** principles, separating concerns into three
+distinct layers.
 
 ```mermaid
 graph TD;
@@ -80,17 +96,17 @@ graph TD;
 
 ### 🏗️ Tech Stack
 
-| Category | Technology / Library | Description |
-| --- | --- | --- |
-| **Language** | **Kotlin** | 100% Native implementation. |
-| **UI** | **Jetpack Compose** | Modern declarative UI toolkit (Material 3). |
-| **DI** | **Hilt (Dagger)** | Dependency Injection for modularity. |
-| **Async** | **Coroutines & Flow** | Managing background threads and reactive streams. |
-| **Data** | **Room Database** | Type-safe local SQLite persistence. |
-| **Nav** | **Navigation Compose** | Type-Safe navigation with **Kotlin Serialization**. |
-| **Maps** | **Maps SDK for Android** | Google Maps implementation with `maps-compose`. |
-| **Background** | **Foreground Service** | For persistent location monitoring. |
-| **Permissions** | **Accompanist** | Handling runtime permissions gracefully. |
+| Category        | Technology / Library     | Description                                         |
+|-----------------|--------------------------|-----------------------------------------------------|
+| **Language**    | **Kotlin**               | 100% Native implementation.                         |
+| **UI**          | **Jetpack Compose**      | Modern declarative UI toolkit (Material 3).         |
+| **DI**          | **Hilt (Dagger)**        | Dependency Injection for modularity.                |
+| **Async**       | **Coroutines & Flow**    | Managing background threads and reactive streams.   |
+| **Data**        | **Room Database**        | Type-safe local SQLite persistence.                 |
+| **Nav**         | **Navigation Compose**   | Type-Safe navigation with **Kotlin Serialization**. |
+| **Maps**        | **Maps SDK for Android** | Google Maps implementation with `maps-compose`.     |
+| **Background**  | **Foreground Service**   | For persistent location monitoring.                 |
+| **Permissions** | **Accompanist**          | Handling runtime permissions gracefully.            |
 
 ---
 
@@ -124,11 +140,14 @@ com.vahitkeskin.targetping
 
 ## 🧩 Under The Hood: How Tracking Works?
 
-Target Ping does not rely on the OS's `GeofenceClient`, which often fails due to network or battery restrictions. Instead, it uses a manual calculation engine:
+Target Ping does not rely on the OS's `GeofenceClient`, which often fails due to network or battery
+restrictions. Instead, it uses a manual calculation engine:
 
-1. **Service Start:** When the user taps "Play", `LocationTrackingService` starts as a **Foreground Service**.
+1. **Service Start:** When the user taps "Play", `LocationTrackingService` starts as a **Foreground
+   Service**.
 2. **GPS Lock:** It subscribes to `FusedLocationProviderClient` with `PRIORITY_HIGH_ACCURACY`.
-3. **Math Engine:** On every location update, the app calculates the **Haversine Distance** between the user and all active targets in the database.
+3. **Math Engine:** On every location update, the app calculates the **Haversine Distance** between
+   the user and all active targets in the database.
 4. **Trigger:** If `Distance < Radius`, a high-priority notification is fired immediately.
 
 ---
@@ -136,31 +155,29 @@ Target Ping does not rely on the OS's `GeofenceClient`, which often fails due to
 ## ⚙️ Installation & Setup
 
 1. **Clone the Repository**
+
 ```bash
 git clone [https://github.com/vahitkeskin/TargetPing.git](https://github.com/vahitkeskin/TargetPing.git)
 
 ```
 
-
 2. **Configure API Key**
+
 * Go to Google Cloud Console.
 * Enable **Maps SDK for Android**.
 * Add your API key to `local.properties`:
+
 ```properties
 
 MAPS_API_KEY=YOUR_GOOGLE_MAPS_API_KEY
 
 ```
 
-
-
-
 3. **Build & Run**
+
 * Open in Android Studio (Iguana+).
 * Sync Gradle.
 * Run on a physical device for best GPS results.
-
-
 
 ---
 
@@ -197,10 +214,13 @@ MAPS_API_KEY=YOUR_GOOGLE_MAPS_API_KEY
 This project is open-source for **educational and portfolio demonstration purposes**.
 
 You are encouraged to:
+
 * 👀 **Review** the code architecture and patterns.
 * 🍴 **Fork** the repository for personal study.
 * 🔧 **Experiment** with the source code.
 
-**However, commercial use, redistribution, or publishing this application (or a substantially similar derivative) to the Google Play Store is strictly prohibited without prior written permission.**
+**However, commercial use, redistribution, or publishing this application (or a substantially
+similar derivative) to the Google Play Store is strictly prohibited without prior written
+permission.**
 
 For commercial inquiries or licensing, please contact the author.
