@@ -1,8 +1,8 @@
 <p align="center">
-  <img src="https://via.placeholder.com/150/00E5FF/000000?text=GEO+TACT" alt="Geo Tact Logo" width="120" height="120" style="border-radius: 20px;">
+  <img src="https://via.placeholder.com/150/00E5FF/000000?text=Target+Ping" alt="Target Ping Logo" width="120" height="120" style="border-radius: 20px;">
 </p>
 
-<h1 align="center">GEO TACT</h1>
+<h1 align="center">TARGET PING</h1>
 <p align="center">
   <strong>Tactical Location Intelligence & Surveillance System</strong>
 </p>
@@ -25,9 +25,9 @@
 
 ## 🛰️ Mission & Overview
 
-**Geo Tact** is not just another GPS alarm; it is a **military-grade, precision tracking utility** engineered for Android. It enables users to define tactical perimeters (Geo-Fences) and receive high-priority alerts upon entry.
+**Target Ping** is not just another GPS alarm; it is a **military-grade, precision tracking utility** engineered for Android. It enables users to define tactical perimeters (Geo-Fences) and receive high-priority alerts upon entry.
 
-Unlike standard apps that rely on the unreliable Android Geofencing API, Geo Tact utilizes a custom **Foreground Service Architecture** to ensure **100% reliability** in background operations, bypassing aggressive OEM battery optimizations.
+Unlike standard apps that rely on the unreliable Android Geofencing API, Target Ping utilizes a custom **Foreground Service Architecture** to ensure **100% reliability** in background operations, bypassing aggressive OEM battery optimizations.
 
 > *"Precision is not an option, it is the standard."*
 
@@ -124,7 +124,7 @@ com.vahitkeskin.targetping
 
 ## 🧩 Under The Hood: How Tracking Works?
 
-Geo Tact does not rely on the OS's `GeofenceClient`, which often fails due to network or battery restrictions. Instead, it uses a manual calculation engine:
+Target Ping does not rely on the OS's `GeofenceClient`, which often fails due to network or battery restrictions. Instead, it uses a manual calculation engine:
 
 1. **Service Start:** When the user taps "Play", `LocationTrackingService` starts as a **Foreground Service**.
 2. **GPS Lock:** It subscribes to `FusedLocationProviderClient` with `PRIORITY_HIGH_ACCURACY`.
@@ -137,7 +137,7 @@ Geo Tact does not rely on the OS's `GeofenceClient`, which often fails due to ne
 
 1. **Clone the Repository**
 ```bash
-git clone [https://github.com/vahitkeskin/geo-tact.git](https://github.com/vahitkeskin/geo-tact.git)
+git clone [https://github.com/vahitkeskin/TargetPing.git](https://github.com/vahitkeskin/TargetPing.git)
 
 ```
 
@@ -189,10 +189,17 @@ MAPS_API_KEY=AIzaSyD...
 
 ---
 
-<p align="center">
-Made with ❤️ and Kotlin
-</p>
+## ⚖️ License & Copyright
 
-```
+**Copyright © 2026 Vahit Keskin. All Rights Reserved.**
 
-```
+This project is open-source for **educational and portfolio demonstration purposes**.
+
+You are encouraged to:
+* 👀 **Review** the code architecture and patterns.
+* 🍴 **Fork** the repository for personal study.
+* 🔧 **Experiment** with the source code.
+
+**However, commercial use, redistribution, or publishing this application (or a substantially similar derivative) to the Google Play Store is strictly prohibited without prior written permission.**
+
+For commercial inquiries or licensing, please contact the author.
