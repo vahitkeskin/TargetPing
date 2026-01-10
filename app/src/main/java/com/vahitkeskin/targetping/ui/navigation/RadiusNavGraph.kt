@@ -9,6 +9,7 @@ import androidx.navigation.toRoute
 import com.vahitkeskin.targetping.ui.home.AddEditScreen
 import com.vahitkeskin.targetping.ui.features.list.ListScreen
 import com.vahitkeskin.targetping.ui.features.map.MapScreen
+import com.vahitkeskin.targetping.ui.features.targets.TargetsListScreen
 import com.vahitkeskin.targetping.ui.home.HomeViewModel
 
 @Composable
@@ -25,22 +26,30 @@ fun RadiusNavGraph() {
         composable<Screen.Map> {
             MapScreen(
                 viewModel = sharedViewModel,
-                onNavigateToList = { navController.navigate(Screen.List) },
+                // HATA DÜZELTİLDİ: onNavigateToList parametresi SİLİNDİ.
+                // Artık listeye gitmek için alt menüyü kullanıyoruz.
                 onNavigateToAdd = { latLng ->
-                    // Konum seçerek eklemeye git
-                    // Burada lat/lng parametre olarak geçilebilir veya VM'de tutulabilir
-                    navController.navigate(Screen.AddEdit())
+                    // Yeni bir hedef eklemek için (ID yok)
+                    navController.navigate(Screen.AddEdit(targetId = null))
                 }
             )
         }
 
         // 2. LİSTE EKRANI
         composable<Screen.List> {
-            ListScreen(
+            // İSİM DÜZELTİLDİ: ListScreen -> TargetsListScreen
+            TargetsListScreen(
                 viewModel = sharedViewModel,
-                onNavigateToMap = { navController.popBackStack() },
-                onNavigateToDetail = { id -> navController.navigate(Screen.AddEdit(targetId = id)) },
-                onNavigateToAdd = { navController.navigate(Screen.AddEdit()) }
+                onNavigateToMap = {
+                    // Haritaya geri dön
+                    navController.navigate(Screen.Map) {
+                        popUpTo(Screen.Map) { inclusive = true }
+                    }
+                },
+                onEditTarget = { target ->
+                    // Düzenlemek için ID gönderiyoruz
+                    navController.navigate(Screen.AddEdit(targetId = target.id))
+                }
             )
         }
 

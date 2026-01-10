@@ -18,62 +18,68 @@ import javax.inject.Inject
 @HiltViewModel
 class HomeViewModel @Inject constructor(
     private val repository: TargetRepository,
-    private val application: Application // Servisi başlatmak için Context lazım
+    private val application: Application
 ) : ViewModel() {
 
-    // --- STATE: Hedef Listesi ---
+    // --- LİSTE VERİSİ ---
     private val _targets = MutableStateFlow<List<TargetLocation>>(emptyList())
     val targets: StateFlow<List<TargetLocation>> = _targets.asStateFlow()
 
-    // --- STATE: Takip Açık mı? ---
-    // (Gerçek bir uygulamada bu durumu DataStore veya SharedPreferences'ta tutmak daha iyidir)
+    // --- TAKİP DURUMU (Play/Stop) ---
     private val _isTracking = MutableStateFlow(false)
     val isTracking: StateFlow<Boolean> = _isTracking.asStateFlow()
 
+    // --- PUSULA NAVİGASYONU (Yeni Eklenen) ---
+    // Hangi hedefe kilitlendiğimizi tutar. Null ise navigasyon kapalıdır.
+    private val _navigationTarget = MutableStateFlow<TargetLocation?>(null)
+    val navigationTarget: StateFlow<TargetLocation?> = _navigationTarget.asStateFlow()
+
     init {
-        // ViewModel oluştuğunda verileri dinlemeye başla
         fetchTargets()
     }
 
     private fun fetchTargets() {
         viewModelScope.launch {
-            // Flow kullandığımız için veritabanı değişince burası otomatik tetiklenir
             repository.getTargets().collect { list ->
                 _targets.value = list
             }
         }
     }
 
-    // --- FONKSİYON 1: Takibi Aç/Kapa (toggleTracking) ---
+    // --- NAVİGASYON FONKSİYONLARI (Bunlar eksikti) ---
+    fun startNavigation(target: TargetLocation) {
+        _navigationTarget.value = target
+    }
+
+    fun stopNavigation() {
+        _navigationTarget.value = null
+    }
+
+    // --- TAKİP SERVİSİ (Play/Stop) ---
     fun toggleTracking(enable: Boolean) {
         _isTracking.value = enable
-
         val serviceIntent = Intent(application, LocationTrackingService::class.java).apply {
             action = if (enable) LocationTrackingService.ACTION_START else LocationTrackingService.ACTION_STOP
         }
-
         if (enable) {
-            // Servisi Başlat (Android O ve üzeri için Foreground şart)
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
                 application.startForegroundService(serviceIntent)
             } else {
                 application.startService(serviceIntent)
             }
         } else {
-            // Servisi Durdur (Intent göndererek servise dur emri veriyoruz)
             application.startService(serviceIntent)
         }
     }
 
-    // --- FONKSİYON 2: Hedefi Aktif/Pasif Yap (toggleTargetActive) ---
+    // --- HEDEF YÖNETİMİ ---
     fun toggleTargetActive(id: String, isActive: Boolean) {
         viewModelScope.launch {
             repository.updateTargetStatus(id, isActive)
         }
     }
 
-    // --- Diğer Fonksiyonlar (Ekleme / Silme) ---
-
+    // Haritadan veya Listeden ekleme yapmak için
     fun addTarget(name: String, lat: Double, lng: Double, radius: Int) {
         viewModelScope.launch {
             val newTarget = TargetLocation(
