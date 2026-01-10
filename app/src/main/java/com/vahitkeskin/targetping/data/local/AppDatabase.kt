@@ -19,32 +19,48 @@ data class TargetEntity(
     val longitude: Double,
     val radiusMeters: Int,
     val isActive: Boolean,
-    val lastTriggered: Long
+    // Yeni eklenen alan (Varsayılan 0: Hiç tetiklenmedi)
+    val lastTriggered: Long = 0
 ) {
-    fun toDomain() = TargetLocation(id, name, latitude, longitude, radiusMeters, isActive, lastTriggered)
+    // Entity -> Domain dönüşümü
+    fun toDomain() = TargetLocation(
+        id = id,
+        name = name,
+        latitude = latitude,
+        longitude = longitude,
+        radiusMeters = radiusMeters,
+        isActive = isActive,
+        lastTriggered = lastTriggered
+    )
 }
 
-fun TargetLocation.toEntity() = TargetEntity(id, name, latitude, longitude, radiusMeters, isActive, lastTriggered)
+fun TargetLocation.toEntity() =
+    TargetEntity(id, name, latitude, longitude, radiusMeters, isActive, lastTriggered)
 
 @Dao
 interface TargetDao {
+    // RepositoryImpl içinde "dao.getAllTargetsFlow()" dedik, o yüzden isim bu olmalı:
     @Query("SELECT * FROM targets")
-    fun getAll(): Flow<List<TargetEntity>>
+    fun getAllTargetsFlow(): Flow<List<TargetEntity>>
 
-    @Query("SELECT * FROM targets WHERE isActive = 1")
-    fun getActive(): Flow<List<TargetEntity>>
+    // RepositoryImpl içinde "dao.getAllTargetsOneShot()" dedik:
+    @Query("SELECT * FROM targets")
+    suspend fun getAllTargetsOneShot(): List<TargetEntity>
+
+    @Query("SELECT * FROM targets WHERE id = :id")
+    suspend fun getTargetById(id: String): TargetEntity?
 
     @Insert(onConflict = OnConflictStrategy.REPLACE)
-    suspend fun insert(target: TargetEntity)
+    suspend fun insertTarget(target: TargetEntity)
 
     @Query("DELETE FROM targets WHERE id = :id")
-    suspend fun delete(id: String)
+    suspend fun deleteTarget(id: String)
 
     @Query("UPDATE targets SET isActive = :isActive WHERE id = :id")
-    suspend fun updateState(id: String, isActive: Boolean)
+    suspend fun updateTargetStatus(id: String, isActive: Boolean)
 }
 
 @Database(entities = [TargetEntity::class], version = 1)
 abstract class AppDatabase : RoomDatabase() {
-    abstract fun targetDao(): TargetDao
+    abstract fun targetDao(): TargetDao // Bu fonksiyon ismi AppModule ile aynı olmalı
 }

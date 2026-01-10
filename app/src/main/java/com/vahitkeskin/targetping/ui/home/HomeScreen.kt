@@ -4,12 +4,9 @@ import android.Manifest
 import android.annotation.SuppressLint
 import android.content.pm.PackageManager
 import android.location.Geocoder
-import android.os.Build
-import androidx.compose.animation.AnimatedContent
 import androidx.compose.animation.core.*
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.Canvas
-import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.background
 import androidx.compose.foundation.basicMarquee
 import androidx.compose.foundation.border
@@ -33,10 +30,12 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.PathEffect
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.graphics.drawscope.rotate
+import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
-import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -46,8 +45,6 @@ import com.google.android.gms.maps.CameraUpdateFactory
 import com.google.android.gms.maps.model.CameraPosition
 import com.google.android.gms.maps.model.LatLng
 import com.google.maps.android.compose.*
-import com.vahitkeskin.targetping.ui.home.GlassCard
-import com.vahitkeskin.targetping.ui.home.HomeViewModel
 import com.vahitkeskin.targetping.utils.getNavigationBarHeightDp
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
@@ -60,7 +57,6 @@ private val CyberTeal = Color(0xFF00E5FF)
 private val AlertRed = Color(0xFFFF2A68)
 private val DarkSurface = Color(0xFF1E1E1E).copy(alpha = 0.95f)
 
-@OptIn(ExperimentalFoundationApi::class)
 @SuppressLint("MissingPermission")
 @Composable
 fun AddEditScreen(
@@ -69,63 +65,50 @@ fun AddEditScreen(
     onBack: () -> Unit
 ) {
     val context = LocalContext.current
+    val density = LocalDensity.current
     val targets by viewModel.targets.collectAsState()
     val scope = rememberCoroutineScope()
 
-    // Düzenleme modu mu?
+    // State'ler
     val existingTarget = remember(targetId, targets) { targets.find { it.id == targetId } }
     val isEditing = existingTarget != null
-
-    // Form Değişkenleri
     var name by remember { mutableStateOf(existingTarget?.name ?: "") }
     var radiusStr by remember { mutableStateOf(existingTarget?.radiusMeters?.toString() ?: "100") }
-
-    // Adres State'i
     var addressText by remember { mutableStateOf("Locating sector...") }
     var isAddressLoading by remember { mutableStateOf(false) }
 
-    // İzin Kontrolü
+    // Alt panel yüksekliğini ölçüp haritayı ona göre yukarı iteceğiz
+    var bottomPanelHeight by remember { mutableStateOf(0.dp) }
+
     val hasLocationPermission = remember {
         ContextCompat.checkSelfPermission(context, Manifest.permission.ACCESS_FINE_LOCATION) == PackageManager.PERMISSION_GRANTED
     }
 
-    val defaultPos = LatLng(41.0082, 28.9784) // İstanbul
+    val defaultPos = LatLng(41.0082, 28.9784)
     val initialPos = existingTarget?.let { LatLng(it.latitude, it.longitude) } ?: defaultPos
 
     val cameraPositionState = rememberCameraPositionState {
         position = CameraPosition.fromLatLngZoom(initialPos, 16f)
     }
 
-    // --- ADRES ÇÖZÜMLEME (REVERSE GEOCODING) ---
-    // Harita hareket etmeyi bıraktığında (isMoving = false), 1 saniye bekle ve adresi bul.
+    // --- REVERSE GEOCODING ---
     LaunchedEffect(cameraPositionState.isMoving) {
         if (cameraPositionState.isMoving) {
-            addressText = "Acquiring coordinates..."
+            addressText = "Scanning coordinates..."
             isAddressLoading = true
         } else {
-            // Harita durdu, 1 saniye bekle (Debounce)
-            delay(1000)
-
+            delay(800) // Debounce
             val target = cameraPositionState.position.target
             try {
-                // Arkaplan thread'inde çalıştır
                 val addresses = withContext(Dispatchers.IO) {
                     try {
                         val geocoder = Geocoder(context, Locale.getDefault())
-                        // API 33 öncesi ve sonrası uyumluluğu için basit yaklaşım (Blocking call in IO dispatcher)
                         @Suppress("DEPRECATION")
                         geocoder.getFromLocation(target.latitude, target.longitude, 1)
-                    } catch (e: Exception) {
-                        null
-                    }
+                    } catch (e: Exception) { null }
                 }
-
-                if (!addresses.isNullOrEmpty()) {
-                    addressText = addresses[0].getAddressLine(0) ?: "Unknown Sector"
-                } else {
-                    // Adres bulunamazsa koordinatları göster
-                    addressText = "Lat: ${String.format("%.4f", target.latitude)} Lng: ${String.format("%.4f", target.longitude)}"
-                }
+                addressText = if (!addresses.isNullOrEmpty()) addresses[0].getAddressLine(0) ?: "Unknown Sector"
+                else "Lat: ${String.format("%.4f", target.latitude)} Lng: ${String.format("%.4f", target.longitude)}"
             } catch (e: Exception) {
                 addressText = "Signal Lost"
             } finally {
@@ -134,7 +117,7 @@ fun AddEditScreen(
         }
     }
 
-    // --- AUTO-FOCUS ---
+    // --- AUTO FOCUS ---
     LaunchedEffect(Unit) {
         if (!isEditing && hasLocationPermission) {
             val client = LocationServices.getFusedLocationProviderClient(context)
@@ -142,10 +125,7 @@ fun AddEditScreen(
                 if (location != null) {
                     scope.launch {
                         cameraPositionState.animate(
-                            CameraUpdateFactory.newLatLngZoom(
-                                LatLng(location.latitude, location.longitude),
-                                16f
-                            )
+                            CameraUpdateFactory.newLatLngZoom(LatLng(location.latitude, location.longitude), 16f)
                         )
                     }
                 }
@@ -165,10 +145,13 @@ fun AddEditScreen(
                 .fillMaxSize()
                 .padding(padding)
         ) {
-            // 1. HARİTA
+            // 1. HARİTA (Padding Ayarlı)
+            // Alt panel yüksekliği kadar alttan padding veriyoruz.
+            // Böylece haritanın "Merkezi" ve "Google Logosu" otomatik yukarı kayıyor.
             GoogleMap(
                 modifier = Modifier.fillMaxSize(),
                 cameraPositionState = cameraPositionState,
+                contentPadding = PaddingValues(bottom = bottomPanelHeight),
                 properties = MapProperties(
                     isMyLocationEnabled = hasLocationPermission,
                     mapType = MapType.HYBRID,
@@ -188,167 +171,140 @@ fun AddEditScreen(
                 )
             }
 
-            // 2. GRID OVERLAY
+            // 2. GRID KATMANI
             TacticalGridOverlay()
 
-            // 3. CROSSHAIR
-            Box(modifier = Modifier.align(Alignment.Center)) {
+            // 3. CROSSHAIR (Map Padding sayesinde otomatik olarak görünür alanda ortalanır)
+            // Haritaya padding verdiğimiz için Alignment.Center yerine, paddingi hesaba katarak konumlandırmalıyız
+            // Ancak GoogleMap contentPadding kullandığı için, haritanın target'ı görsel merkeze kayar.
+            // Bizim Crosshair'i de görsel merkeze (Ekran ortası - Panel Yarısı) kaydırmamız lazım.
+            // En temiz yöntem: Box içinde Alignment.Center kullanıp, padding kadar yukarı itmek.
+            Box(
+                modifier = Modifier
+                    .align(Alignment.Center)
+                    .padding(bottom = bottomPanelHeight) // Nişangahı harita merkeziyle senkronize et
+            ) {
                 TacticalCrosshair(color = if (radiusInt > 0) CyberTeal else AlertRed)
             }
 
-            // 4. ÜST BUTONLAR
-            Row(
+            // 4. ÜST BAR & ADRES HUD
+            Column(
                 modifier = Modifier
                     .statusBarsPadding()
                     .padding(16.dp)
-                    .fillMaxWidth(),
-                horizontalArrangement = Arrangement.SpaceBetween
+                    .fillMaxWidth()
             ) {
-                IconButton(
-                    onClick = onBack,
-                    modifier = Modifier
-                        .size(48.dp)
-                        .background(DarkSurface.copy(0.8f), CircleShape)
-                        .border(1.dp, Color.White.copy(0.2f), CircleShape)
+                // Üst Butonlar
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween
                 ) {
-                    Icon(Icons.Rounded.ArrowBack, null, tint = Color.White)
-                }
+                    IconButton(
+                        onClick = onBack,
+                        modifier = Modifier
+                            .size(48.dp)
+                            .background(DarkSurface.copy(0.8f), CircleShape)
+                            .border(1.dp, Color.White.copy(0.2f), CircleShape)
+                    ) {
+                        Icon(Icons.Rounded.ArrowBack, null, tint = Color.White)
+                    }
 
-                IconButton(
-                    onClick = {
-                        if (hasLocationPermission) {
-                            val client = LocationServices.getFusedLocationProviderClient(context)
-                            client.lastLocation.addOnSuccessListener { loc ->
-                                if (loc != null) {
-                                    scope.launch {
-                                        cameraPositionState.animate(
-                                            CameraUpdateFactory.newLatLngZoom(LatLng(loc.latitude, loc.longitude), 16f)
-                                        )
+                    IconButton(
+                        onClick = {
+                            if (hasLocationPermission) {
+                                val client = LocationServices.getFusedLocationProviderClient(context)
+                                client.lastLocation.addOnSuccessListener { loc ->
+                                    if (loc != null) {
+                                        scope.launch {
+                                            cameraPositionState.animate(
+                                                CameraUpdateFactory.newLatLngZoom(LatLng(loc.latitude, loc.longitude), 16f)
+                                            )
+                                        }
                                     }
                                 }
                             }
-                        }
-                    },
-                    modifier = Modifier
-                        .size(48.dp)
-                        .background(CyberTeal, CircleShape)
-                        .border(2.dp, Color.Black.copy(0.1f), CircleShape)
-                ) {
-                    Icon(Icons.Rounded.GpsFixed, null, tint = Color.Black)
+                        },
+                        modifier = Modifier
+                            .size(48.dp)
+                            .background(CyberTeal, CircleShape)
+                            .border(2.dp, Color.Black.copy(0.1f), CircleShape)
+                    ) {
+                        Icon(Icons.Rounded.GpsFixed, null, tint = Color.Black)
+                    }
                 }
+
+                Spacer(modifier = Modifier.height(16.dp))
+
+                // --- NEW: FLOATING ADDRESS HUD ---
+                // Adres bilgisini alttan alıp buraya, "Yüzen Hap" şeklinde koyduk.
+                AddressHudPill(addressText, isAddressLoading)
             }
 
-            // 5. ALT PANEL (INFO CARD)
-            Column(
+            // 5. ALT KONTROL PANELİ (INPUTS ONLY)
+            // Buranın yüksekliğini ölçüp haritaya bildireceğiz.
+            Box(
                 modifier = Modifier
                     .align(Alignment.BottomCenter)
-                    .imePadding()
-                    .fillMaxWidth()
+                    .onGloballyPositioned { coordinates ->
+                        // Yüksekliği Dp'ye çevirip state'e atıyoruz
+                        bottomPanelHeight = with(density) { coordinates.size.height.toDp() }
+                    }
+                    .imePadding() // Klavye açılınca yukarı iter
+                    .background(
+                        Brush.verticalGradient(
+                            listOf(Color.Transparent, Color.Black.copy(0.8f), Color.Black)
+                        )
+                    )
             ) {
-                GlassCard(
+                Column(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .padding(horizontal = 16.dp, vertical = context.getNavigationBarHeightDp()),
-                    cornerRadius = 24.dp
+                        .padding(horizontal = 16.dp)
+                        .padding(bottom = context.getNavigationBarHeightDp() + 16.dp) // Nav bar payı
                 ) {
-                    Column(
-                        modifier = Modifier.padding(24.dp),
-                        verticalArrangement = Arrangement.spacedBy(20.dp)
+                    GlassCard(
+                        modifier = Modifier.fillMaxWidth(),
+                        cornerRadius = 24.dp
                     ) {
-                        // --- ADRES GÖSTERİM ALANI ---
-                        Row(
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .background(Color.Black.copy(0.3f), RoundedCornerShape(8.dp))
-                                .padding(12.dp),
-                            verticalAlignment = Alignment.CenterVertically
+                        Column(
+                            modifier = Modifier.padding(20.dp),
+                            verticalArrangement = Arrangement.spacedBy(16.dp)
                         ) {
-                            // Yanıp sönen ikon
-                            val infiniteTransition = rememberInfiniteTransition(label = "pulse")
-                            val alpha by infiniteTransition.animateFloat(
-                                initialValue = 0.5f, targetValue = 1f,
-                                animationSpec = infiniteRepeatable(tween(1000), RepeatMode.Reverse),
-                                label = "alpha"
-                            )
-
-                            Icon(
-                                imageVector = Icons.Rounded.LocationOn,
-                                contentDescription = null,
-                                tint = if (isAddressLoading) AlertRed.copy(alpha) else CyberTeal,
-                                modifier = Modifier.size(24.dp)
-                            )
-
-                            Spacer(modifier = Modifier.width(12.dp))
-
-                            // Kayan Yazı (Marquee)
-                            Text(
-                                text = addressText,
-                                color = Color.White,
-                                style = MaterialTheme.typography.bodyMedium.copy(
-                                    fontFamily = androidx.compose.ui.text.font.FontFamily.Monospace
-                                ),
-                                maxLines = 1,
-                                modifier = Modifier
-                                    .weight(1f)
-                                    .basicMarquee( // Kayan yazı efekti
-                                        iterations = Int.MAX_VALUE,
-                                        velocity = 40.dp
-                                    )
-                            )
-                        }
-
-                        // --- HEADER ---
-                        Row(
-                            verticalAlignment = Alignment.CenterVertically,
-                            modifier = Modifier.fillMaxWidth()
-                        ) {
-                            Icon(Icons.Rounded.Radar, null, tint = CyberTeal, modifier = Modifier.size(20.dp))
-                            Spacer(modifier = Modifier.width(8.dp))
-                            Text(
-                                text = "TARGET ACQUISITION",
-                                style = MaterialTheme.typography.labelMedium,
-                                color = CyberTeal,
-                                letterSpacing = 2.sp,
-                                fontWeight = FontWeight.Bold
-                            )
-                        }
-
-                        // --- INPUTS ---
-                        CyberInput(
-                            value = name,
-                            onValueChange = { name = it },
-                            label = "DESIGNATION NAME",
-                            placeholder = "e.g. Base Alpha"
-                        )
-
-                        Row(verticalAlignment = Alignment.CenterVertically) {
-                            Box(modifier = Modifier.weight(1f)) {
-                                CyberInput(
-                                    value = radiusStr,
-                                    onValueChange = { if (it.all { c -> c.isDigit() }) radiusStr = it },
-                                    label = "PERIMETER RADIUS",
-                                    keyboardType = KeyboardType.Number,
-                                    suffix = "M"
-                                )
+                            // Header
+                            Row(verticalAlignment = Alignment.CenterVertically) {
+                                Icon(Icons.Rounded.Radar, null, tint = CyberTeal, modifier = Modifier.size(16.dp))
+                                Spacer(modifier = Modifier.width(8.dp))
+                                Text("TARGET PARAMETERS", style = MaterialTheme.typography.labelSmall, color = CyberTeal, fontWeight = FontWeight.Bold, letterSpacing = 2.sp)
                             }
-                        }
 
-                        // --- AKSİYON BUTONU ---
-                        ActionPrimaryButton(
-                            text = if (isEditing) "UPDATE COORDINATES" else "ESTABLISH LINK",
-                            onClick = {
-                                if (name.isNotBlank()) {
-                                    if (existingTarget != null) viewModel.deleteTarget(existingTarget.id)
-                                    viewModel.addTarget(
-                                        name,
-                                        centerTarget.latitude,
-                                        centerTarget.longitude,
-                                        radiusInt
-                                    )
-                                    onBack()
+                            // Inputs (Yan Yana değil alt alta daha güvenli mobil için)
+                            CyberInput(
+                                value = name,
+                                onValueChange = { name = it },
+                                label = "DESIGNATION",
+                                placeholder = "e.g. Home Base"
+                            )
+
+                            CyberInput(
+                                value = radiusStr,
+                                onValueChange = { if (it.all { c -> c.isDigit() }) radiusStr = it },
+                                label = "RADIUS (METERS)",
+                                keyboardType = KeyboardType.Number,
+                                suffix = "M"
+                            )
+
+                            // Button
+                            ActionPrimaryButton(
+                                text = if (isEditing) "UPDATE TARGET" else "CONFIRM POSITION",
+                                onClick = {
+                                    if (name.isNotBlank()) {
+                                        if (existingTarget != null) viewModel.deleteTarget(existingTarget.id)
+                                        viewModel.addTarget(name, centerTarget.latitude, centerTarget.longitude, radiusInt)
+                                        onBack()
+                                    }
                                 }
-                            }
-                        )
+                            )
+                        }
                     }
                 }
             }
@@ -356,7 +312,56 @@ fun AddEditScreen(
     }
 }
 
-// --- CANVAS NİŞANGAH ---
+// --- YENİ ADRES GÖSTERİM BİLEŞENİ (ÜSTTE) ---
+@Composable
+fun AddressHudPill(address: String, isLoading: Boolean) {
+    Box(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(horizontal = 16.dp),
+        contentAlignment = Alignment.Center
+    ) {
+        GlassCard(
+            modifier = Modifier.wrapContentSize(), // İçerik kadar yer kapla
+            cornerRadius = 50.dp // Tam yuvarlak hap şekli
+        ) {
+            Row(
+                modifier = Modifier
+                    .padding(horizontal = 16.dp, vertical = 8.dp),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                val infiniteTransition = rememberInfiniteTransition(label = "hud_pulse")
+                val alpha by infiniteTransition.animateFloat(
+                    initialValue = 0.4f, targetValue = 1f,
+                    animationSpec = infiniteRepeatable(tween(800), RepeatMode.Reverse), label = "alpha"
+                )
+
+                Icon(
+                    imageVector = Icons.Rounded.LocationOn,
+                    contentDescription = null,
+                    tint = if (isLoading) AlertRed.copy(alpha) else CyberTeal,
+                    modifier = Modifier.size(16.dp)
+                )
+
+                Spacer(modifier = Modifier.width(8.dp))
+
+                Text(
+                    text = address,
+                    color = Color.White,
+                    style = MaterialTheme.typography.bodySmall.copy(
+                        fontFamily = FontFamily.Monospace,
+                        fontWeight = FontWeight.Medium
+                    ),
+                    maxLines = 1,
+                    modifier = Modifier.basicMarquee() // Sığmazsa kaysın
+                )
+            }
+        }
+    }
+}
+
+// --- Diğer Yardımcı Bileşenler (Aynı kalıyor) ---
+
 @Composable
 fun TacticalCrosshair(color: Color) {
     val infiniteTransition = rememberInfiniteTransition(label = "crosshair")
@@ -383,14 +388,13 @@ fun TacticalCrosshair(color: Color) {
                 drawLine(color, Offset(s, s/2), Offset(s-c, s/2), st)
             }
         }
-        Canvas(modifier = Modifier.size(10.dp)) {
+        Canvas(modifier = Modifier.size(8.dp)) {
             drawCircle(color = AlertRed, radius = size.minDimension/2 * scale)
             drawCircle(color = Color.White, radius = size.minDimension/4, alpha = 0.8f)
         }
     }
 }
 
-// --- GRID OVERLAY ---
 @Composable
 fun TacticalGridOverlay() {
     Canvas(modifier = Modifier.fillMaxSize()) {
@@ -401,7 +405,6 @@ fun TacticalGridOverlay() {
     }
 }
 
-// --- CYBER INPUT ---
 @Composable
 fun CyberInput(
     value: String,
@@ -428,7 +431,6 @@ fun CyberInput(
     }
 }
 
-// --- ACTION BUTTON ---
 @Composable
 fun ActionPrimaryButton(text: String, onClick: () -> Unit) {
     Button(
@@ -447,26 +449,18 @@ fun ActionPrimaryButton(text: String, onClick: () -> Unit) {
 @Composable
 fun GlassCard(
     modifier: Modifier = Modifier,
-    cornerRadius: Dp = 24.dp, // Dinamik köşe yuvarlaklığı eklendi
+    cornerRadius: Dp = 24.dp,
     content: @Composable () -> Unit
 ) {
     Surface(
         modifier = modifier,
-        // Arkaplan rengini %85 opaklıkta tutuyoruz ki alttaki harita/zemin hafifçe hissedilsin (Gerçek cam hissi)
         color = Color(0xFF1E1E1E).copy(alpha = 0.85f),
         shape = RoundedCornerShape(cornerRadius),
-        // Kenarlara "Dikey Gradyan" (Vertical Gradient) ekliyoruz.
-        // Bu, ışığın yukarıdan vurduğu hissini verir ve kartı 3 boyutlu gösterir.
         border = BorderStroke(
-            width = 1.dp,
-            brush = Brush.verticalGradient(
-                colors = listOf(
-                    Color.White.copy(alpha = 0.15f), // Üst kenar hafif parlak
-                    Color.White.copy(alpha = 0.02f)  // Alt kenar sönük
-                )
-            )
+            1.dp,
+            Brush.verticalGradient(listOf(Color.White.copy(0.15f), Color.White.copy(0.02f)))
         ),
-        shadowElevation = 8.dp // Hafif derinlik
+        shadowElevation = 8.dp
     ) {
         content()
     }
