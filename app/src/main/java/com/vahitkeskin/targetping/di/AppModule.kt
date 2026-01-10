@@ -3,8 +3,7 @@ package com.vahitkeskin.targetping.di
 import android.app.Application
 import androidx.room.Room
 import com.vahitkeskin.targetping.data.local.AppDatabase
-import com.vahitkeskin.targetping.data.repository.LocationRepositoryImpl
-import com.vahitkeskin.targetping.domain.repository.LocationRepository
+import com.vahitkeskin.targetping.data.local.TargetDao // Bunu ekledik
 import dagger.Module
 import dagger.Provides
 import dagger.hilt.InstallIn
@@ -21,13 +20,15 @@ object AppModule {
         return Room.databaseBuilder(
             app,
             AppDatabase::class.java,
-            "radius_alert_db"
+            "target_ping_db" // Veritabanı ismini proje ile uyumlu yaptım
         ).build()
     }
 
+    // EKSİK OLAN PARÇA BU:
+    // Hilt'e DAO'yu nasıl bulacağını söylemeliyiz.
     @Provides
     @Singleton
-    fun provideLocationRepository(db: AppDatabase): LocationRepository {
-        return LocationRepositoryImpl(db.targetDao())
+    fun provideTargetDao(db: AppDatabase): TargetDao {
+        return db.targetDao()
     }
 }

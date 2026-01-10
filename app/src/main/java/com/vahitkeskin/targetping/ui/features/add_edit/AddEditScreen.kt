@@ -3,49 +3,39 @@ package com.vahitkeskin.targetping.ui.features.add_edit
 import android.Manifest
 import android.annotation.SuppressLint
 import android.content.pm.PackageManager
+import android.location.Geocoder
+import androidx.compose.animation.core.*
+import androidx.compose.foundation.BorderStroke
+import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
+import androidx.compose.foundation.basicMarquee
 import androidx.compose.foundation.border
-import androidx.compose.foundation.layout.Arrangement
-import androidx.compose.foundation.layout.Box
-import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.Spacer
-import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.height
-import androidx.compose.foundation.layout.imePadding
-import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.layout.statusBarsPadding
-import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.rounded.ArrowBack
 import androidx.compose.material.icons.rounded.GpsFixed
+import androidx.compose.material.icons.rounded.LocationOn
+import androidx.compose.material.icons.rounded.Radar
 import androidx.compose.material.icons.rounded.Save
-import androidx.compose.material3.ExtendedFloatingActionButton
-import androidx.compose.material3.Icon
-import androidx.compose.material3.IconButton
-import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.OutlinedTextField
-import androidx.compose.material3.OutlinedTextFieldDefaults
-import androidx.compose.material3.Scaffold
-import androidx.compose.material3.Text
-import androidx.compose.runtime.Composable
-import androidx.compose.runtime.collectAsState
-import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.remember
-import androidx.compose.runtime.rememberCoroutineScope
-import androidx.compose.runtime.setValue
+import androidx.compose.material3.*
+import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.PathEffect
+import androidx.compose.ui.graphics.drawscope.Stroke
+import androidx.compose.ui.graphics.drawscope.rotate
+import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
+import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.core.content.ContextCompat
@@ -53,18 +43,16 @@ import com.google.android.gms.location.LocationServices
 import com.google.android.gms.maps.CameraUpdateFactory
 import com.google.android.gms.maps.model.CameraPosition
 import com.google.android.gms.maps.model.LatLng
-import com.google.maps.android.compose.Circle
-import com.google.maps.android.compose.GoogleMap
-import com.google.maps.android.compose.MapProperties
-import com.google.maps.android.compose.MapType
-import com.google.maps.android.compose.MapUiSettings
-import com.google.maps.android.compose.rememberCameraPositionState
-import com.vahitkeskin.targetping.ui.home.GlassCard
+import com.google.maps.android.compose.*
 import com.vahitkeskin.targetping.ui.home.HomeViewModel
+import com.vahitkeskin.targetping.utils.getNavigationBarHeightDp
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
+import java.util.Locale
 
-// Önceki dosyalarda tanımladığımız renkleri burada tekrar kullanıyoruz
-// (Eğer Theme.kt içine taşıdıysan oradan import et)
+// Renk Paleti
 private val CyberTeal = Color(0xFF00E5FF)
 private val AlertRed = Color(0xFFFF2A68)
 private val DarkSurface = Color(0xFF1E1E1E).copy(alpha = 0.95f)
@@ -76,220 +64,235 @@ fun AddEditScreen(
     targetId: String?,
     onBack: () -> Unit
 ) {
-    // State'ler
+    val context = LocalContext.current
+    val density = LocalDensity.current
     val targets by viewModel.targets.collectAsState()
     val scope = rememberCoroutineScope()
 
-    // Düzenleme modu mu? Eğer ID varsa ilgili veriyi bul.
+    // State'ler
     val existingTarget = remember(targetId, targets) { targets.find { it.id == targetId } }
-
-    // Form Değişkenleri
+    val isEditing = existingTarget != null
     var name by remember { mutableStateOf(existingTarget?.name ?: "") }
     var radiusStr by remember { mutableStateOf(existingTarget?.radiusMeters?.toString() ?: "100") }
+    // TÜRKÇE: Başlangıç metni
+    var addressText by remember { mutableStateOf("Sektör taranıyor...") }
+    var isAddressLoading by remember { mutableStateOf(false) }
 
-    // Harita Kamera Pozisyonu (Varsayılan İstanbul veya Mevcut Hedef)
-    val initialPos = existingTarget?.let { LatLng(it.latitude, it.longitude) }
-        ?: LatLng(41.0082, 28.9784)
+    var bottomPanelHeight by remember { mutableStateOf(0.dp) }
+
+    val hasLocationPermission = remember {
+        ContextCompat.checkSelfPermission(context, Manifest.permission.ACCESS_FINE_LOCATION) == PackageManager.PERMISSION_GRANTED
+    }
+
+    val defaultPos = LatLng(41.0082, 28.9784)
+    val initialPos = existingTarget?.let { LatLng(it.latitude, it.longitude) } ?: defaultPos
 
     val cameraPositionState = rememberCameraPositionState {
         position = CameraPosition.fromLatLngZoom(initialPos, 16f)
     }
 
-    // Haritanın tam ortası (Hedeflenen Koordinat)
+    // --- ADRES ÇÖZÜMLEME (TÜRKÇE) ---
+    LaunchedEffect(cameraPositionState.isMoving) {
+        if (cameraPositionState.isMoving) {
+            addressText = "Koordinatlar alınıyor..."
+            isAddressLoading = true
+        } else {
+            delay(800)
+            val target = cameraPositionState.position.target
+            try {
+                val addresses = withContext(Dispatchers.IO) {
+                    try {
+                        // Locale("tr") ile Türkçe adres iste
+                        val geocoder = Geocoder(context, Locale("tr", "TR"))
+                        @Suppress("DEPRECATION")
+                        geocoder.getFromLocation(target.latitude, target.longitude, 1)
+                    } catch (e: Exception) { null }
+                }
+                addressText = if (!addresses.isNullOrEmpty()) addresses[0].getAddressLine(0) ?: "Bilinmeyen Bölge"
+                else "Enlem: ${String.format("%.4f", target.latitude)} Boylam: ${String.format("%.4f", target.longitude)}"
+            } catch (e: Exception) {
+                addressText = "Sinyal Kaybı"
+            } finally {
+                isAddressLoading = false
+            }
+        }
+    }
+
+    // --- AUTO FOCUS ---
+    LaunchedEffect(Unit) {
+        if (!isEditing && hasLocationPermission) {
+            val client = LocationServices.getFusedLocationProviderClient(context)
+            client.lastLocation.addOnSuccessListener { location ->
+                if (location != null) {
+                    scope.launch {
+                        cameraPositionState.animate(
+                            CameraUpdateFactory.newLatLngZoom(LatLng(location.latitude, location.longitude), 16f)
+                        )
+                    }
+                }
+            }
+        }
+    }
+
     val centerTarget = cameraPositionState.position.target
     val radiusInt = radiusStr.toIntOrNull() ?: 100
 
-    // AddEditScreen.kt içine ekle:
-
-    val context = LocalContext.current
-    val hasLocationPermission = remember {
-        ContextCompat.checkSelfPermission(
-            context,
-            Manifest.permission.ACCESS_FINE_LOCATION
-        ) == PackageManager.PERMISSION_GRANTED
-    }
-
     Scaffold(
         containerColor = Color.Black,
-        floatingActionButton = {
-            // Kaydet Butonu (Floating)
-            ExtendedFloatingActionButton(
-                onClick = {
-                    if (name.isNotBlank()) {
-                        // Eğer ID varsa güncelleme (delete+insert veya update), yoksa ekleme
-                        // Basitlik için burada addTarget çağırıyoruz,
-                        // gerçek senaryoda updateTarget fonksiyonu VM'e eklenmeli.
-                        if (existingTarget != null) viewModel.deleteTarget(existingTarget.id)
-
-                        viewModel.addTarget(
-                            name,
-                            centerTarget.latitude,
-                            centerTarget.longitude,
-                            radiusInt
-                        )
-                        onBack()
-                    }
-                },
-                containerColor = CyberTeal,
-                contentColor = Color.Black,
-                icon = { Icon(Icons.Rounded.Save, null) },
-                text = { Text("CONFIRM TARGET", fontWeight = FontWeight.Bold) }
-            )
-        }
+        contentWindowInsets = WindowInsets(0, 0, 0, 0)
     ) { padding ->
-        Box(modifier = Modifier.fillMaxSize()) {
-
-            // --- 1. HARİTA KATMANI ---
+        Box(
+            modifier = Modifier
+                .fillMaxSize()
+                .padding(padding)
+        ) {
+            // 1. HARİTA
             GoogleMap(
                 modifier = Modifier.fillMaxSize(),
                 cameraPositionState = cameraPositionState,
+                contentPadding = PaddingValues(bottom = bottomPanelHeight),
                 properties = MapProperties(
-                    isMyLocationEnabled = hasLocationPermission, // Burayı güncelle
+                    isMyLocationEnabled = hasLocationPermission,
                     mapType = MapType.HYBRID,
                 ),
                 uiSettings = MapUiSettings(
                     zoomControlsEnabled = false,
                     compassEnabled = false,
-                    myLocationButtonEnabled = false // Kendimiz yapacağız
+                    myLocationButtonEnabled = false
                 )
             ) {
-                // Seçim Alanını Gösteren Çember (Kamera hareket ettikçe güncellenir)
                 Circle(
                     center = centerTarget,
                     radius = radiusInt.toDouble(),
-                    strokeColor = CyberTeal.copy(alpha = 0.8f),
-                    strokeWidth = 4f,
-                    fillColor = CyberTeal.copy(alpha = 0.2f)
+                    strokeColor = CyberTeal.copy(alpha = 0.9f),
+                    strokeWidth = 3f,
+                    fillColor = CyberTeal.copy(alpha = 0.15f)
                 )
             }
 
-            // --- 2. MERKEZ NİŞANGAH (CROSSHAIR) ---
-            // Haritanın tam ortasında sabit durur
-            Box(modifier = Modifier.align(Alignment.Center)) {
-                // Dış Halka
-                Box(
-                    modifier = Modifier
-                        .size(24.dp)
-                        .border(2.dp, Color.White, CircleShape)
-                )
-                // İç Nokta
-                Box(
-                    modifier = Modifier
-                        .size(4.dp)
-                        .background(AlertRed, CircleShape)
-                        .align(Alignment.Center)
-                )
-                // Çizgiler
-                Box(
-                    modifier = Modifier
-                        .width(40.dp)
-                        .height(1.dp)
-                        .background(Color.White.copy(0.5f))
-                        .align(Alignment.Center)
-                )
-                Box(
-                    modifier = Modifier
-                        .height(40.dp)
-                        .width(1.dp)
-                        .background(Color.White.copy(0.5f))
-                        .align(Alignment.Center)
-                )
+            // 2. GRID
+            TacticalGridOverlay()
+
+            // 3. CROSSHAIR
+            Box(
+                modifier = Modifier
+                    .align(Alignment.Center)
+                    .padding(bottom = bottomPanelHeight)
+            ) {
+                TacticalCrosshair(color = if (radiusInt > 0) CyberTeal else AlertRed)
             }
 
-            // --- 3. ÜST BAR (GERİ TUŞU) ---
-            Row(
+            // 4. ÜST BAR & ADRES
+            Column(
                 modifier = Modifier
                     .statusBarsPadding()
                     .padding(16.dp)
-                    .fillMaxWidth(),
-                horizontalArrangement = Arrangement.SpaceBetween
+                    .fillMaxWidth()
             ) {
-                // Geri Butonu (Glass Effect)
-                IconButton(
-                    onClick = onBack,
-                    modifier = Modifier
-                        .background(DarkSurface.copy(0.6f), CircleShape)
-                        .border(1.dp, Color.White.copy(0.1f), CircleShape)
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween
                 ) {
-                    Icon(Icons.Rounded.ArrowBack, null, tint = Color.White)
-                }
+                    IconButton(
+                        onClick = onBack,
+                        modifier = Modifier
+                            .size(48.dp)
+                            .background(DarkSurface.copy(0.8f), CircleShape)
+                            .border(1.dp, Color.White.copy(0.2f), CircleShape)
+                    ) {
+                        Icon(Icons.Rounded.ArrowBack, null, tint = Color.White)
+                    }
 
-                // Konumumu Bul Butonu
-                IconButton(
-                    onClick = {
-                        // 1. İzin kontrolü yap
-                        if (hasLocationPermission) {
-                            val client = LocationServices.getFusedLocationProviderClient(context)
-                            // 2. Son konumu al
-                            client.lastLocation.addOnSuccessListener { location ->
-                                // 3. Konum null değilse oraya animasyonla git
-                                if (location != null) {
-                                    scope.launch {
-                                        cameraPositionState.animate(
-                                            CameraUpdateFactory.newLatLngZoom(
-                                                LatLng(location.latitude, location.longitude),
-                                                16f
+                    IconButton(
+                        onClick = {
+                            if (hasLocationPermission) {
+                                val client = LocationServices.getFusedLocationProviderClient(context)
+                                client.lastLocation.addOnSuccessListener { loc ->
+                                    if (loc != null) {
+                                        scope.launch {
+                                            cameraPositionState.animate(
+                                                CameraUpdateFactory.newLatLngZoom(LatLng(loc.latitude, loc.longitude), 16f)
                                             )
-                                        )
+                                        }
                                     }
                                 }
                             }
-                        }
-                    },
-                    modifier = Modifier
-                        .background(CyberTeal, CircleShape)
-                ) {
-                    Icon(Icons.Rounded.GpsFixed, null, tint = Color.Black)
+                        },
+                        modifier = Modifier
+                            .size(48.dp)
+                            .background(CyberTeal, CircleShape)
+                            .border(2.dp, Color.Black.copy(0.1f), CircleShape)
+                    ) {
+                        Icon(Icons.Rounded.GpsFixed, null, tint = Color.Black)
+                    }
                 }
+
+                Spacer(modifier = Modifier.height(16.dp))
+
+                AddressHudPill(addressText, isAddressLoading)
             }
 
-            // --- 4. ALT KONTROL PANELİ (GLASSMORPHISM) ---
-            // Klavye açılınca yukarı kayması için imePadding ekliyoruz
-            Column(
+            // 5. ALT PANEL (TÜRKÇE ARAYÜZ)
+            Box(
                 modifier = Modifier
                     .align(Alignment.BottomCenter)
+                    .onGloballyPositioned { coordinates ->
+                        bottomPanelHeight = with(density) { coordinates.size.height.toDp() }
+                    }
                     .imePadding()
-                    .padding(bottom = 100.dp) // FAB için yer bırak
-                    .padding(horizontal = 16.dp)
+                    .background(
+                        Brush.verticalGradient(
+                            listOf(Color.Transparent, Color.Black.copy(0.8f), Color.Black)
+                        )
+                    )
             ) {
-                GlassCard(modifier = Modifier.fillMaxWidth()) {
-                    Column(
-                        modifier = Modifier.padding(20.dp),
-                        verticalArrangement = Arrangement.spacedBy(16.dp)
+                Column(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(horizontal = 16.dp)
+                        .padding(bottom = context.getNavigationBarHeightDp() + 16.dp)
+                ) {
+                    GlassCard(
+                        modifier = Modifier.fillMaxWidth(),
+                        cornerRadius = 24.dp
                     ) {
-                        Text(
-                            text = "TARGET PARAMETERS",
-                            style = MaterialTheme.typography.labelMedium,
-                            color = CyberTeal,
-                            letterSpacing = 2.sp,
-                            fontWeight = FontWeight.Bold
-                        )
-
-                        // İsim Alanı
-                        CustomTextField(
-                            value = name,
-                            onValueChange = { name = it },
-                            label = "Target Designation"
-                        )
-
-                        // Yarıçap Alanı
-                        Row(verticalAlignment = Alignment.CenterVertically) {
-                            Box(modifier = Modifier.weight(1f)) {
-                                CustomTextField(
-                                    value = radiusStr,
-                                    onValueChange = {
-                                        if (it.all { c -> c.isDigit() }) radiusStr = it
-                                    },
-                                    label = "Radius",
-                                    keyboardType = KeyboardType.Number
-                                )
+                        Column(
+                            modifier = Modifier.padding(20.dp),
+                            verticalArrangement = Arrangement.spacedBy(16.dp)
+                        ) {
+                            // Header: "HEDEF PARAMETRELERİ"
+                            Row(verticalAlignment = Alignment.CenterVertically) {
+                                Icon(Icons.Rounded.Radar, null, tint = CyberTeal, modifier = Modifier.size(16.dp))
+                                Spacer(modifier = Modifier.width(8.dp))
+                                Text("HEDEF PARAMETRELERİ", style = MaterialTheme.typography.labelSmall, color = CyberTeal, fontWeight = FontWeight.Bold, letterSpacing = 2.sp)
                             }
-                            Spacer(modifier = Modifier.width(12.dp))
-                            Text(
-                                text = "METERS",
-                                color = Color.White.copy(0.5f),
-                                fontWeight = FontWeight.Bold,
-                                fontSize = 12.sp
+
+                            // Inputs: "HEDEF ADI", "OPERASYON YARIÇAPI"
+                            CyberInput(
+                                value = name,
+                                onValueChange = { name = it },
+                                label = "HEDEF TANIMI / ADI",
+                                placeholder = "Örn: Ev, Ofis, Üs Bölgesi"
+                            )
+
+                            CyberInput(
+                                value = radiusStr,
+                                onValueChange = { if (it.all { c -> c.isDigit() }) radiusStr = it },
+                                label = "OPERASYON YARIÇAPI (METRE)",
+                                keyboardType = KeyboardType.Number,
+                                suffix = "M"
+                            )
+
+                            // Button: "KONUMU ONAYLA"
+                            ActionPrimaryButton(
+                                text = if (isEditing) "HEDEFİ GÜNCELLE" else "KONUMU ONAYLA",
+                                onClick = {
+                                    if (name.isNotBlank()) {
+                                        if (existingTarget != null) viewModel.deleteTarget(existingTarget.id)
+                                        viewModel.addTarget(name, centerTarget.latitude, centerTarget.longitude, radiusInt)
+                                        onBack()
+                                    }
+                                }
                             )
                         }
                     }
@@ -299,31 +302,154 @@ fun AddEditScreen(
     }
 }
 
-// --- YARDIMCI ÖZEL TEXT FIELD ---
+// --- BİLEŞENLER ---
 @Composable
-fun CustomTextField(
+fun AddressHudPill(address: String, isLoading: Boolean) {
+    Box(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(horizontal = 16.dp),
+        contentAlignment = Alignment.Center
+    ) {
+        GlassCard(
+            modifier = Modifier.wrapContentSize(),
+            cornerRadius = 50.dp
+        ) {
+            Row(
+                modifier = Modifier
+                    .padding(horizontal = 16.dp, vertical = 8.dp),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                val infiniteTransition = rememberInfiniteTransition(label = "hud_pulse")
+                val alpha by infiniteTransition.animateFloat(
+                    initialValue = 0.4f, targetValue = 1f,
+                    animationSpec = infiniteRepeatable(tween(800), RepeatMode.Reverse), label = "alpha"
+                )
+
+                Icon(
+                    imageVector = Icons.Rounded.LocationOn,
+                    contentDescription = null,
+                    tint = if (isLoading) AlertRed.copy(alpha) else CyberTeal,
+                    modifier = Modifier.size(16.dp)
+                )
+
+                Spacer(modifier = Modifier.width(8.dp))
+
+                Text(
+                    text = address,
+                    color = Color.White,
+                    style = MaterialTheme.typography.bodySmall.copy(
+                        fontFamily = androidx.compose.ui.text.font.FontFamily.Monospace,
+                        fontWeight = FontWeight.Medium
+                    ),
+                    maxLines = 1,
+                    modifier = Modifier.basicMarquee()
+                )
+            }
+        }
+    }
+}
+
+@Composable
+fun TacticalCrosshair(color: Color) {
+    val infiniteTransition = rememberInfiniteTransition(label = "crosshair")
+    val rotation by infiniteTransition.animateFloat(
+        initialValue = 0f, targetValue = 360f,
+        animationSpec = infiniteRepeatable(tween(8000, easing = LinearEasing)), label = "rotation"
+    )
+    val scale by infiniteTransition.animateFloat(
+        initialValue = 1f, targetValue = 1.2f,
+        animationSpec = infiniteRepeatable(tween(1000, easing = FastOutSlowInEasing), RepeatMode.Reverse), label = "scale"
+    )
+
+    Box(contentAlignment = Alignment.Center) {
+        Canvas(modifier = Modifier.size(80.dp)) {
+            rotate(rotation) {
+                drawCircle(
+                    color = color.copy(alpha = 0.3f),
+                    style = Stroke(width = 2.dp.toPx(), pathEffect = PathEffect.dashPathEffect(floatArrayOf(20f, 20f), 0f))
+                )
+                val s = size.minDimension; val c = s * 0.1f; val st = 3.dp.toPx()
+                drawLine(color, Offset(s/2, 0f), Offset(s/2, c), st)
+                drawLine(color, Offset(s/2, s), Offset(s/2, s-c), st)
+                drawLine(color, Offset(0f, s/2), Offset(c, s/2), st)
+                drawLine(color, Offset(s, s/2), Offset(s-c, s/2), st)
+            }
+        }
+        Canvas(modifier = Modifier.size(8.dp)) {
+            drawCircle(color = AlertRed, radius = size.minDimension/2 * scale)
+            drawCircle(color = Color.White, radius = size.minDimension/4, alpha = 0.8f)
+        }
+    }
+}
+
+@Composable
+fun TacticalGridOverlay() {
+    Canvas(modifier = Modifier.fillMaxSize()) {
+        val step = 100.dp.toPx()
+        val color = Color.White.copy(alpha = 0.05f)
+        for (x in 0..size.width.toInt() step step.toInt()) drawLine(color, Offset(x.toFloat(), 0f), Offset(x.toFloat(), size.height), 1f)
+        for (y in 0..size.height.toInt() step step.toInt()) drawLine(color, Offset(0f, y.toFloat()), Offset(size.width, y.toFloat()), 1f)
+    }
+}
+
+@Composable
+fun CyberInput(
     value: String,
     onValueChange: (String) -> Unit,
     label: String,
-    keyboardType: KeyboardType = KeyboardType.Text
+    placeholder: String = "",
+    keyboardType: KeyboardType = KeyboardType.Text,
+    suffix: String? = null
 ) {
-    OutlinedTextField(
-        value = value,
-        onValueChange = onValueChange,
-        label = { Text(label) },
-        modifier = Modifier.fillMaxWidth(),
-        singleLine = true,
-        keyboardOptions = KeyboardOptions(keyboardType = keyboardType),
-        colors = OutlinedTextFieldDefaults.colors(
-            focusedContainerColor = Color.Black.copy(0.3f),
-            unfocusedContainerColor = Color.Black.copy(0.3f),
-            focusedBorderColor = CyberTeal,
-            unfocusedBorderColor = Color.Gray.copy(0.5f),
-            focusedTextColor = Color.White,
-            unfocusedTextColor = Color.White,
-            focusedLabelColor = CyberTeal,
-            unfocusedLabelColor = Color.Gray
+    Column {
+        Text(text = label, style = MaterialTheme.typography.labelSmall, color = Color.Gray, fontWeight = FontWeight.Bold, modifier = Modifier.padding(start = 4.dp, bottom = 4.dp))
+        OutlinedTextField(
+            value = value, onValueChange = onValueChange, modifier = Modifier.fillMaxWidth(), singleLine = true,
+            placeholder = { Text(placeholder, color = Color.Gray.copy(0.5f)) },
+            keyboardOptions = KeyboardOptions(keyboardType = keyboardType),
+            trailingIcon = suffix?.let { { Text(it, color = CyberTeal, fontWeight = FontWeight.Bold, modifier = Modifier.padding(end = 16.dp)) } },
+            colors = OutlinedTextFieldDefaults.colors(
+                focusedContainerColor = Color.Black.copy(0.4f), unfocusedContainerColor = Color.Black.copy(0.2f),
+                focusedBorderColor = CyberTeal, unfocusedBorderColor = Color.White.copy(0.1f),
+                focusedTextColor = Color.White, unfocusedTextColor = Color.White, cursorColor = CyberTeal
+            ),
+            shape = RoundedCornerShape(8.dp)
+        )
+    }
+}
+
+@Composable
+fun ActionPrimaryButton(text: String, onClick: () -> Unit) {
+    Button(
+        onClick = onClick, modifier = Modifier.fillMaxWidth().height(56.dp),
+        colors = ButtonDefaults.buttonColors(containerColor = CyberTeal, contentColor = Color.Black),
+        shape = RoundedCornerShape(12.dp), elevation = ButtonDefaults.buttonElevation(defaultElevation = 8.dp)
+    ) {
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            Icon(Icons.Rounded.Save, null, modifier = Modifier.size(20.dp))
+            Spacer(modifier = Modifier.width(8.dp))
+            Text(text = text, style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Black, letterSpacing = 1.sp))
+        }
+    }
+}
+
+@Composable
+fun GlassCard(
+    modifier: Modifier = Modifier,
+    cornerRadius: Dp = 24.dp,
+    content: @Composable () -> Unit
+) {
+    Surface(
+        modifier = modifier,
+        color = Color(0xFF1E1E1E).copy(alpha = 0.85f),
+        shape = RoundedCornerShape(cornerRadius),
+        border = BorderStroke(
+            1.dp,
+            Brush.verticalGradient(listOf(Color.White.copy(0.15f), Color.White.copy(0.02f)))
         ),
-        shape = RoundedCornerShape(12.dp)
-    )
+        shadowElevation = 8.dp
+    ) {
+        content()
+    }
 }
