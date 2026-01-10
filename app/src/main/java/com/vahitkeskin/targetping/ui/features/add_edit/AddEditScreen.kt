@@ -84,36 +84,58 @@ fun AddEditScreen(
         ContextCompat.checkSelfPermission(context, Manifest.permission.ACCESS_FINE_LOCATION) == PackageManager.PERMISSION_GRANTED
     }
 
-    val defaultPos = LatLng(41.0082, 28.9784)
-    val initialPos = existingTarget?.let { LatLng(it.latitude, it.longitude) } ?: defaultPos
+    // DEĞİŞİKLİK BURADA:
+    // defaultPos değişkenini SİLDİK.
+    // Eğer düzenleme (existingTarget) varsa onun konumuyla başla.
+    // Eğer yeni ekleme ise (0,0) ile başla. (Auto Focus bunu hemen düzeltecek)
+    val initialPos = existingTarget?.let { LatLng(it.latitude, it.longitude) } ?: LatLng(0.0, 0.0)
 
     val cameraPositionState = rememberCameraPositionState {
         position = CameraPosition.fromLatLngZoom(initialPos, 16f)
     }
 
-    // --- ADRES ÇÖZÜMLEME (TÜRKÇE) ---
-    LaunchedEffect(cameraPositionState.isMoving) {
-        if (cameraPositionState.isMoving) {
-            addressText = "Koordinatlar alınıyor..."
-            isAddressLoading = true
-        } else {
-            delay(800)
-            val target = cameraPositionState.position.target
-            try {
-                val addresses = withContext(Dispatchers.IO) {
-                    try {
-                        // Locale("tr") ile Türkçe adres iste
-                        val geocoder = Geocoder(context, Locale("tr", "TR"))
-                        @Suppress("DEPRECATION")
-                        geocoder.getFromLocation(target.latitude, target.longitude, 1)
-                    } catch (e: Exception) { null }
+    // --- AUTO FOCUS (GÜÇLENDİRİLMİŞ) ---
+    LaunchedEffect(Unit) {
+        // Sadece yeni kayıt eklerken (isEditing değilse) ve İzin varsa çalışır
+        if (!isEditing && hasLocationPermission) {
+            val client = LocationServices.getFusedLocationProviderClient(context)
+
+            // YÖNTEM 1: En hızlı yöntem (Önbellekteki son konum)
+            client.lastLocation.addOnSuccessListener { location ->
+                if (location != null) {
+                    scope.launch {
+                        cameraPositionState.animate(
+                            CameraUpdateFactory.newLatLngZoom(
+                                LatLng(
+                                    location.latitude,
+                                    location.longitude
+                                ), 16f
+                            ),
+                            1000 // 1 saniyede yumuşak geçiş
+                        )
+                    }
+                } else {
+                    // YÖNTEM 2: Eğer son konum yoksa, güncel konumu taze olarak iste
+                    // (Bu kısım GPS yeni açıldıysa hayat kurtarır)
+                    client.getCurrentLocation(
+                        com.google.android.gms.location.Priority.PRIORITY_HIGH_ACCURACY,
+                        null
+                    ).addOnSuccessListener { currLoc ->
+                        if (currLoc != null) {
+                            scope.launch {
+                                cameraPositionState.animate(
+                                    CameraUpdateFactory.newLatLngZoom(
+                                        LatLng(
+                                            currLoc.latitude,
+                                            currLoc.longitude
+                                        ), 16f
+                                    ),
+                                    1000
+                                )
+                            }
+                        }
+                    }
                 }
-                addressText = if (!addresses.isNullOrEmpty()) addresses[0].getAddressLine(0) ?: "Bilinmeyen Bölge"
-                else "Enlem: ${String.format("%.4f", target.latitude)} Boylam: ${String.format("%.4f", target.longitude)}"
-            } catch (e: Exception) {
-                addressText = "Sinyal Kaybı"
-            } finally {
-                isAddressLoading = false
             }
         }
     }
@@ -126,7 +148,12 @@ fun AddEditScreen(
                 if (location != null) {
                     scope.launch {
                         cameraPositionState.animate(
-                            CameraUpdateFactory.newLatLngZoom(LatLng(location.latitude, location.longitude), 16f)
+                            CameraUpdateFactory.newLatLngZoom(
+                                LatLng(
+                                    location.latitude,
+                                    location.longitude
+                                ), 16f
+                            )
                         )
                     }
                 }
@@ -206,12 +233,18 @@ fun AddEditScreen(
                     IconButton(
                         onClick = {
                             if (hasLocationPermission) {
-                                val client = LocationServices.getFusedLocationProviderClient(context)
+                                val client =
+                                    LocationServices.getFusedLocationProviderClient(context)
                                 client.lastLocation.addOnSuccessListener { loc ->
                                     if (loc != null) {
                                         scope.launch {
                                             cameraPositionState.animate(
-                                                CameraUpdateFactory.newLatLngZoom(LatLng(loc.latitude, loc.longitude), 16f)
+                                                CameraUpdateFactory.newLatLngZoom(
+                                                    LatLng(
+                                                        loc.latitude,
+                                                        loc.longitude
+                                                    ), 16f
+                                                )
                                             )
                                         }
                                     }
@@ -262,9 +295,20 @@ fun AddEditScreen(
                         ) {
                             // Header: "HEDEF PARAMETRELERİ"
                             Row(verticalAlignment = Alignment.CenterVertically) {
-                                Icon(Icons.Rounded.Radar, null, tint = CyberTeal, modifier = Modifier.size(16.dp))
+                                Icon(
+                                    Icons.Rounded.Radar,
+                                    null,
+                                    tint = CyberTeal,
+                                    modifier = Modifier.size(16.dp)
+                                )
                                 Spacer(modifier = Modifier.width(8.dp))
-                                Text("HEDEF PARAMETRELERİ", style = MaterialTheme.typography.labelSmall, color = CyberTeal, fontWeight = FontWeight.Bold, letterSpacing = 2.sp)
+                                Text(
+                                    "HEDEF PARAMETRELERİ",
+                                    style = MaterialTheme.typography.labelSmall,
+                                    color = CyberTeal,
+                                    fontWeight = FontWeight.Bold,
+                                    letterSpacing = 2.sp
+                                )
                             }
 
                             // Inputs: "HEDEF ADI", "OPERASYON YARIÇAPI"
@@ -288,8 +332,15 @@ fun AddEditScreen(
                                 text = if (isEditing) "HEDEFİ GÜNCELLE" else "KONUMU ONAYLA",
                                 onClick = {
                                     if (name.isNotBlank()) {
-                                        if (existingTarget != null) viewModel.deleteTarget(existingTarget.id)
-                                        viewModel.addTarget(name, centerTarget.latitude, centerTarget.longitude, radiusInt)
+                                        if (existingTarget != null) viewModel.deleteTarget(
+                                            existingTarget.id
+                                        )
+                                        viewModel.addTarget(
+                                            name,
+                                            centerTarget.latitude,
+                                            centerTarget.longitude,
+                                            radiusInt
+                                        )
                                         onBack()
                                     }
                                 }
@@ -322,8 +373,10 @@ fun AddressHudPill(address: String, isLoading: Boolean) {
             ) {
                 val infiniteTransition = rememberInfiniteTransition(label = "hud_pulse")
                 val alpha by infiniteTransition.animateFloat(
-                    initialValue = 0.4f, targetValue = 1f,
-                    animationSpec = infiniteRepeatable(tween(800), RepeatMode.Reverse), label = "alpha"
+                    initialValue = 0.4f,
+                    targetValue = 1f,
+                    animationSpec = infiniteRepeatable(tween(800), RepeatMode.Reverse),
+                    label = "alpha"
                 )
 
                 Icon(
@@ -359,7 +412,10 @@ fun TacticalCrosshair(color: Color) {
     )
     val scale by infiniteTransition.animateFloat(
         initialValue = 1f, targetValue = 1.2f,
-        animationSpec = infiniteRepeatable(tween(1000, easing = FastOutSlowInEasing), RepeatMode.Reverse), label = "scale"
+        animationSpec = infiniteRepeatable(
+            tween(1000, easing = FastOutSlowInEasing),
+            RepeatMode.Reverse
+        ), label = "scale"
     )
 
     Box(contentAlignment = Alignment.Center) {
@@ -367,18 +423,23 @@ fun TacticalCrosshair(color: Color) {
             rotate(rotation) {
                 drawCircle(
                     color = color.copy(alpha = 0.3f),
-                    style = Stroke(width = 2.dp.toPx(), pathEffect = PathEffect.dashPathEffect(floatArrayOf(20f, 20f), 0f))
+                    style = Stroke(
+                        width = 2.dp.toPx(),
+                        pathEffect = PathEffect.dashPathEffect(floatArrayOf(20f, 20f), 0f)
+                    )
                 )
-                val s = size.minDimension; val c = s * 0.1f; val st = 3.dp.toPx()
-                drawLine(color, Offset(s/2, 0f), Offset(s/2, c), st)
-                drawLine(color, Offset(s/2, s), Offset(s/2, s-c), st)
-                drawLine(color, Offset(0f, s/2), Offset(c, s/2), st)
-                drawLine(color, Offset(s, s/2), Offset(s-c, s/2), st)
+                val s = size.minDimension;
+                val c = s * 0.1f;
+                val st = 3.dp.toPx()
+                drawLine(color, Offset(s / 2, 0f), Offset(s / 2, c), st)
+                drawLine(color, Offset(s / 2, s), Offset(s / 2, s - c), st)
+                drawLine(color, Offset(0f, s / 2), Offset(c, s / 2), st)
+                drawLine(color, Offset(s, s / 2), Offset(s - c, s / 2), st)
             }
         }
         Canvas(modifier = Modifier.size(8.dp)) {
-            drawCircle(color = AlertRed, radius = size.minDimension/2 * scale)
-            drawCircle(color = Color.White, radius = size.minDimension/4, alpha = 0.8f)
+            drawCircle(color = AlertRed, radius = size.minDimension / 2 * scale)
+            drawCircle(color = Color.White, radius = size.minDimension / 4, alpha = 0.8f)
         }
     }
 }
@@ -388,8 +449,18 @@ fun TacticalGridOverlay() {
     Canvas(modifier = Modifier.fillMaxSize()) {
         val step = 100.dp.toPx()
         val color = Color.White.copy(alpha = 0.05f)
-        for (x in 0..size.width.toInt() step step.toInt()) drawLine(color, Offset(x.toFloat(), 0f), Offset(x.toFloat(), size.height), 1f)
-        for (y in 0..size.height.toInt() step step.toInt()) drawLine(color, Offset(0f, y.toFloat()), Offset(size.width, y.toFloat()), 1f)
+        for (x in 0..size.width.toInt() step step.toInt()) drawLine(
+            color,
+            Offset(x.toFloat(), 0f),
+            Offset(x.toFloat(), size.height),
+            1f
+        )
+        for (y in 0..size.height.toInt() step step.toInt()) drawLine(
+            color,
+            Offset(0f, y.toFloat()),
+            Offset(size.width, y.toFloat()),
+            1f
+        )
     }
 }
 
@@ -403,16 +474,38 @@ fun CyberInput(
     suffix: String? = null
 ) {
     Column {
-        Text(text = label, style = MaterialTheme.typography.labelSmall, color = Color.Gray, fontWeight = FontWeight.Bold, modifier = Modifier.padding(start = 4.dp, bottom = 4.dp))
+        Text(
+            text = label,
+            style = MaterialTheme.typography.labelSmall,
+            color = Color.Gray,
+            fontWeight = FontWeight.Bold,
+            modifier = Modifier.padding(start = 4.dp, bottom = 4.dp)
+        )
         OutlinedTextField(
-            value = value, onValueChange = onValueChange, modifier = Modifier.fillMaxWidth(), singleLine = true,
+            value = value,
+            onValueChange = onValueChange,
+            modifier = Modifier.fillMaxWidth(),
+            singleLine = true,
             placeholder = { Text(placeholder, color = Color.Gray.copy(0.5f)) },
             keyboardOptions = KeyboardOptions(keyboardType = keyboardType),
-            trailingIcon = suffix?.let { { Text(it, color = CyberTeal, fontWeight = FontWeight.Bold, modifier = Modifier.padding(end = 16.dp)) } },
+            trailingIcon = suffix?.let {
+                {
+                    Text(
+                        it,
+                        color = CyberTeal,
+                        fontWeight = FontWeight.Bold,
+                        modifier = Modifier.padding(end = 16.dp)
+                    )
+                }
+            },
             colors = OutlinedTextFieldDefaults.colors(
-                focusedContainerColor = Color.Black.copy(0.4f), unfocusedContainerColor = Color.Black.copy(0.2f),
-                focusedBorderColor = CyberTeal, unfocusedBorderColor = Color.White.copy(0.1f),
-                focusedTextColor = Color.White, unfocusedTextColor = Color.White, cursorColor = CyberTeal
+                focusedContainerColor = Color.Black.copy(0.4f),
+                unfocusedContainerColor = Color.Black.copy(0.2f),
+                focusedBorderColor = CyberTeal,
+                unfocusedBorderColor = Color.White.copy(0.1f),
+                focusedTextColor = Color.White,
+                unfocusedTextColor = Color.White,
+                cursorColor = CyberTeal
             ),
             shape = RoundedCornerShape(8.dp)
         )
@@ -422,14 +515,27 @@ fun CyberInput(
 @Composable
 fun ActionPrimaryButton(text: String, onClick: () -> Unit) {
     Button(
-        onClick = onClick, modifier = Modifier.fillMaxWidth().height(56.dp),
-        colors = ButtonDefaults.buttonColors(containerColor = CyberTeal, contentColor = Color.Black),
-        shape = RoundedCornerShape(12.dp), elevation = ButtonDefaults.buttonElevation(defaultElevation = 8.dp)
+        onClick = onClick,
+        modifier = Modifier
+            .fillMaxWidth()
+            .height(56.dp),
+        colors = ButtonDefaults.buttonColors(
+            containerColor = CyberTeal,
+            contentColor = Color.Black
+        ),
+        shape = RoundedCornerShape(12.dp),
+        elevation = ButtonDefaults.buttonElevation(defaultElevation = 8.dp)
     ) {
         Row(verticalAlignment = Alignment.CenterVertically) {
             Icon(Icons.Rounded.Save, null, modifier = Modifier.size(20.dp))
             Spacer(modifier = Modifier.width(8.dp))
-            Text(text = text, style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Black, letterSpacing = 1.sp))
+            Text(
+                text = text,
+                style = MaterialTheme.typography.titleMedium.copy(
+                    fontWeight = FontWeight.Black,
+                    letterSpacing = 1.sp
+                )
+            )
         }
     }
 }
