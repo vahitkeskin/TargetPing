@@ -4,11 +4,14 @@ import kotlinx.serialization.Serializable
 
 sealed interface Screen {
     @Serializable
-    data object Map : Screen // Ana Harita
+    data object Dashboard : Screen
 
     @Serializable
-    data object List : Screen // Liste Ekranı
+    data object Map : Screen
 
     @Serializable
-    data class AddEdit(val targetId: String? = null) : Screen // Ekleme/Düzenleme (ID opsiyonel)
+    data object List : Screen
+
+    @Serializable
+    data class AddEdit(val targetId: String? = null) : Screen
 }
