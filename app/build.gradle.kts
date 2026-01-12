@@ -113,4 +113,13 @@ dependencies {
 
     implementation(libs.accompanist.systemuicontroller) // rememberSystemUiController için
     implementation(libs.kotlinx.serialization.json)     // @Serializable için
+
+    // Lifecycle Service
+    implementation(libs.androidx.lifecycle.service)
+
+    // DataStore Preferences
+    implementation(libs.androidx.datastore.preferences)
+
+    // Biometric Authentication
+    implementation(libs.androidx.biometric)
 }
