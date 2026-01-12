@@ -503,7 +503,7 @@ fun GlassCard(
             1.dp,
             Brush.verticalGradient(listOf(Color.White.copy(0.15f), Color.White.copy(0.02f)))
         ),
-        shadowElevation = 8.dp
+        shadowElevation = 0.dp
     ) {
         content()
     }
