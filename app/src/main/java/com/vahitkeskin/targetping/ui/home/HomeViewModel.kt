@@ -7,36 +7,56 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.vahitkeskin.targetping.data.service.LocationTrackingService
 import com.vahitkeskin.targetping.domain.model.TargetLocation
+import com.vahitkeskin.targetping.domain.repository.AppSettingsRepository
 import com.vahitkeskin.targetping.domain.repository.TargetRepository
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
 import javax.inject.Inject
 
 @HiltViewModel
 class HomeViewModel @Inject constructor(
     private val repository: TargetRepository,
+    private val settingsRepository: AppSettingsRepository,
     private val application: Application
 ) : ViewModel() {
 
-    // --- LİSTE VERİSİ ---
+    // ============================================================================================
+    // STATE FLOWS (UI Durumları)
+    // ============================================================================================
+
+    // 1. Hedef Listesi
     private val _targets = MutableStateFlow<List<TargetLocation>>(emptyList())
     val targets: StateFlow<List<TargetLocation>> = _targets.asStateFlow()
 
-    // --- TAKİP DURUMU (Play/Stop) ---
+    // 2. Takip Durumu (Servis Çalışıyor mu?)
     private val _isTracking = MutableStateFlow(false)
     val isTracking: StateFlow<Boolean> = _isTracking.asStateFlow()
 
-    // --- PUSULA NAVİGASYONU (Yeni Eklenen) ---
-    // Hangi hedefe kilitlendiğimizi tutar. Null ise navigasyon kapalıdır.
+    // 3. Navigasyon (Pusula Kilitli Hedef)
     private val _navigationTarget = MutableStateFlow<TargetLocation?>(null)
     val navigationTarget: StateFlow<TargetLocation?> = _navigationTarget.asStateFlow()
+
+    // 4. Gizli Mod (Stealth Mode)
+    // _isStealthMode silindi. Veri kaynağı doğrudan Repository (DataStore) oldu.
+    val isStealthMode: StateFlow<Boolean> = settingsRepository.isStealthModeEnabled
+        .stateIn(
+            scope = viewModelScope,
+            started = SharingStarted.WhileSubscribed(5000),
+            initialValue = false
+        )
 
     init {
         fetchTargets()
     }
+
+    // ============================================================================================
+    // VERİ İŞLEMLERİ (Data Operations)
+    // ============================================================================================
 
     private fun fetchTargets() {
         viewModelScope.launch {
@@ -46,40 +66,12 @@ class HomeViewModel @Inject constructor(
         }
     }
 
-    // --- NAVİGASYON FONKSİYONLARI (Bunlar eksikti) ---
-    fun startNavigation(target: TargetLocation) {
-        _navigationTarget.value = target
-    }
-
-    fun stopNavigation() {
-        _navigationTarget.value = null
-    }
-
-    // --- TAKİP SERVİSİ (Play/Stop) ---
-    fun toggleTracking(enable: Boolean) {
-        _isTracking.value = enable
-        val serviceIntent = Intent(application, LocationTrackingService::class.java).apply {
-            action = if (enable) LocationTrackingService.ACTION_START else LocationTrackingService.ACTION_STOP
-        }
-        if (enable) {
-            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-                application.startForegroundService(serviceIntent)
-            } else {
-                application.startService(serviceIntent)
-            }
-        } else {
-            application.startService(serviceIntent)
-        }
-    }
-
-    // --- HEDEF YÖNETİMİ ---
     fun toggleTargetActive(id: String, isActive: Boolean) {
         viewModelScope.launch {
             repository.updateTargetStatus(id, isActive)
         }
     }
 
-    // Haritadan veya Listeden ekleme yapmak için
     fun addTarget(name: String, lat: Double, lng: Double, radius: Int) {
         viewModelScope.launch {
             val newTarget = TargetLocation(
@@ -97,6 +89,45 @@ class HomeViewModel @Inject constructor(
     fun deleteTarget(id: String) {
         viewModelScope.launch {
             repository.deleteTarget(id)
+        }
+    }
+
+    // ============================================================================================
+    // NAVİGASYON & TAKİP İŞLEMLERİ (Tracking & Navigation)
+    // ============================================================================================
+
+    fun startNavigation(target: TargetLocation) {
+        _navigationTarget.value = target
+    }
+
+    fun stopNavigation() {
+        _navigationTarget.value = null
+    }
+
+    fun toggleTracking(enable: Boolean) {
+        _isTracking.value = enable
+        val serviceIntent = Intent(application, LocationTrackingService::class.java).apply {
+            action = if (enable) LocationTrackingService.ACTION_START else LocationTrackingService.ACTION_STOP
+        }
+
+        if (enable) {
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+                application.startForegroundService(serviceIntent)
+            } else {
+                application.startService(serviceIntent)
+            }
+        } else {
+            application.startService(serviceIntent)
+        }
+    }
+
+    // ============================================================================================
+    // GİZLİ MOD İŞLEMLERİ (Stealth Mode Actions)
+    // ============================================================================================
+
+    fun setStealthMode(enabled: Boolean) {
+        viewModelScope.launch {
+            settingsRepository.setStealthMode(enabled)
         }
     }
 }

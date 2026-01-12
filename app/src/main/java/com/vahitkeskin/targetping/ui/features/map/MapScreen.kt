@@ -6,23 +6,56 @@ import android.content.res.Resources
 import android.location.Location
 import android.os.Build
 import android.provider.Settings
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.combinedClickable
-import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.rounded.*
-import androidx.compose.material3.*
-import androidx.compose.runtime.*
+import androidx.compose.material.icons.rounded.Add
+import androidx.compose.material.icons.rounded.LocationDisabled
+import androidx.compose.material.icons.rounded.MyLocation
+import androidx.compose.material.icons.rounded.PlayArrow
+import androidx.compose.material.icons.rounded.SatelliteAlt
+import androidx.compose.material.icons.rounded.Stop
+import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.FloatingActionButton
+import androidx.compose.material3.Icon
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.SmallFloatingActionButton
+import androidx.compose.material3.Surface
+import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
+import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.collectAsState
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.saveable.rememberSaveable
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.hapticfeedback.HapticFeedbackType
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import com.google.accompanist.permissions.ExperimentalPermissionsApi
 import com.google.accompanist.permissions.rememberMultiplePermissionsState
@@ -31,14 +64,19 @@ import com.google.android.gms.maps.CameraUpdateFactory
 import com.google.android.gms.maps.model.BitmapDescriptorFactory
 import com.google.android.gms.maps.model.LatLng
 import com.google.android.gms.maps.model.MapStyleOptions
-import com.google.maps.android.compose.*
+import com.google.maps.android.compose.Circle
+import com.google.maps.android.compose.GoogleMap
+import com.google.maps.android.compose.MapProperties
+import com.google.maps.android.compose.MapUiSettings
+import com.google.maps.android.compose.Marker
+import com.google.maps.android.compose.MarkerState
+import com.google.maps.android.compose.rememberCameraPositionState
 import com.vahitkeskin.targetping.R
 import com.vahitkeskin.targetping.ui.components.CompassOverlay
-import com.vahitkeskin.targetping.ui.home.GlassCard
+import com.vahitkeskin.targetping.ui.features.add_edit.GlassCard
 import com.vahitkeskin.targetping.ui.home.HomeViewModel
 import com.vahitkeskin.targetping.ui.home.components.RadarPulseAnimation
 import com.vahitkeskin.targetping.utils.openAppSettings
-import com.vahitkeskin.targetping.utils.uninstallSelf
 import kotlinx.coroutines.launch
 
 private val CyberTeal = Color(0xFF00E5FF)
@@ -141,18 +179,24 @@ fun MapScreen(
                     viewModel.toggleTracking(!isTracking)
                 }
             }
+
             MapAction.ADD_NEW -> {
                 onNavigateToAdd(cameraPositionState.position.target)
             }
+
             MapAction.MY_LOCATION -> {
                 userLocation?.let {
                     scope.launch {
                         cameraPositionState.animate(
-                            CameraUpdateFactory.newLatLngZoom(LatLng(it.latitude, it.longitude), 16f)
+                            CameraUpdateFactory.newLatLngZoom(
+                                LatLng(it.latitude, it.longitude),
+                                16f
+                            )
                         )
                     }
                 }
             }
+
             MapAction.NONE -> {}
         }
 
@@ -173,7 +217,14 @@ fun MapScreen(
                 userLocation = loc
                 if (loc != null && cameraPositionState.position.target.latitude == 0.0) {
                     scope.launch {
-                        cameraPositionState.animate(CameraUpdateFactory.newLatLngZoom(LatLng(loc.latitude, loc.longitude), 15f))
+                        cameraPositionState.animate(
+                            CameraUpdateFactory.newLatLngZoom(
+                                LatLng(
+                                    loc.latitude,
+                                    loc.longitude
+                                ), 15f
+                            )
+                        )
                     }
                 }
 
@@ -194,8 +245,7 @@ fun MapScreen(
             // Konumum işlemi için yukarıdaki location success listener'ı bekliyoruz, burayı pas geç
             else if (pendingAction == MapAction.MY_LOCATION && userLocation == null) {
                 // Bekle, konum gelince yukarıdaki blok çalıştıracak
-            }
-            else {
+            } else {
                 // Diğer tüm durumlarda (Yeni Ekle, vb.) işlemi otomatik yap
                 executeAction(pendingAction)
             }
@@ -274,14 +324,14 @@ fun MapScreen(
         Box(
             modifier = Modifier
                 .statusBarsPadding()
-                .padding(16.dp)
+                .padding(horizontal = 16.dp)
                 .fillMaxWidth()
                 .clip(MaterialTheme.shapes.medium)
                 .combinedClickable(
                     onClick = { },
                     onLongClick = {
                         haptic.performHapticFeedback(HapticFeedbackType.LongPress)
-                        context.uninstallSelf()
+                        viewModel.setStealthMode(true)
                     }
                 )
         ) {
