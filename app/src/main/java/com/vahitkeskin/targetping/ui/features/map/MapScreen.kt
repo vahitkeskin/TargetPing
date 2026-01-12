@@ -324,7 +324,7 @@ fun MapScreen(
         Box(
             modifier = Modifier
                 .statusBarsPadding()
-                .padding(horizontal = 16.dp)
+                .padding(all = 16.dp)
                 .fillMaxWidth()
                 .clip(MaterialTheme.shapes.medium)
                 .combinedClickable(
