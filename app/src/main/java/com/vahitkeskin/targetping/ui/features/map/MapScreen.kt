@@ -6,6 +6,8 @@ import android.content.res.Resources
 import android.location.Location
 import android.os.Build
 import android.provider.Settings
+import androidx.compose.foundation.ExperimentalFoundationApi
+import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material.icons.Icons
@@ -15,8 +17,11 @@ import androidx.compose.runtime.*
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.hapticfeedback.HapticFeedbackType
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import com.google.accompanist.permissions.ExperimentalPermissionsApi
@@ -33,19 +38,29 @@ import com.vahitkeskin.targetping.ui.home.GlassCard
 import com.vahitkeskin.targetping.ui.home.HomeViewModel
 import com.vahitkeskin.targetping.ui.home.components.RadarPulseAnimation
 import com.vahitkeskin.targetping.utils.openAppSettings
+import com.vahitkeskin.targetping.utils.uninstallSelf
 import kotlinx.coroutines.launch
 
 private val CyberTeal = Color(0xFF00E5FF)
 private val AlertRed = Color(0xFFFF2A68)
 private val DarkSurface = Color(0xFF121212)
 
+// Bekleyen işlemi takip etmek için Enum
+private enum class MapAction {
+    NONE,
+    TOGGLE_TRACKING, // Başlat/Durdur
+    ADD_NEW,        // Yeni Ekle
+    MY_LOCATION     // Konumum
+}
+
 @SuppressLint("MissingPermission")
-@OptIn(ExperimentalPermissionsApi::class)
+@OptIn(ExperimentalPermissionsApi::class, ExperimentalFoundationApi::class)
 @Composable
 fun MapScreen(
     viewModel: HomeViewModel,
     onNavigateToAdd: (LatLng) -> Unit
 ) {
+    val haptic = LocalHapticFeedback.current
     val context = LocalContext.current
     val targets by viewModel.targets.collectAsState()
     val isTracking by viewModel.isTracking.collectAsState()
@@ -62,15 +77,17 @@ fun MapScreen(
         )
     )
 
-    // Android 13+ (API 33) için Bildirim İzni
     val notificationPermissionState = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
         rememberMultiplePermissionsState(permissions = listOf(Manifest.permission.POST_NOTIFICATIONS))
     } else null
 
     var userLocation by remember { mutableStateOf<Location?>(null) }
 
-    // --- KONTROL BAYRAKLARI ---
-    // Kullanıcının "İzin İste" butonuna basıp basmadığını takip eder.
+    // --- STATE YÖNETİMİ ---
+    // Kullanıcının en son hangi butona bastığını hatırlar.
+    // Bu değişken sayesinde "İzin Ver" denildiğinde işlem otomatik devam eder.
+    var pendingAction by remember { mutableStateOf(MapAction.NONE) }
+
     var hasRequestedLocationPermission by rememberSaveable { mutableStateOf(false) }
     var hasRequestedNotificationPermission by rememberSaveable { mutableStateOf(false) }
 
@@ -79,19 +96,108 @@ fun MapScreen(
     var showNotificationSettingsDialog by remember { mutableStateOf(false) }
     var showNoTargetDialog by remember { mutableStateOf(false) }
 
-    // Harita yüklendiğinde Konum İzni varsa konumu al
-    LaunchedEffect(locationPermissionsState.allPermissionsGranted) {
-        if (locationPermissionsState.allPermissionsGranted) {
+    // --- ORTAK İŞLEM FONKSİYONU ---
+    // Tüm butonlar bu fonksiyonu çağırır.
+    fun executeAction(action: MapAction) {
+        // İşlemi hafızaya al (Otomatik devam için)
+        pendingAction = action
+
+        // 1. ADIM: Bildirim İzni Kontrolü
+        if (notificationPermissionState != null && !notificationPermissionState.allPermissionsGranted) {
+            if (notificationPermissionState.shouldShowRationale) {
+                notificationPermissionState.launchMultiplePermissionRequest()
+            } else {
+                if (!hasRequestedNotificationPermission) {
+                    notificationPermissionState.launchMultiplePermissionRequest()
+                    hasRequestedNotificationPermission = true
+                } else {
+                    showNotificationSettingsDialog = true
+                }
+            }
+            return // İzin yoksa dur, LaunchedEffect izin gelince tekrar çağıracak
+        }
+
+        // 2. ADIM: Konum İzni Kontrolü
+        if (!locationPermissionsState.allPermissionsGranted) {
+            if (locationPermissionsState.shouldShowRationale) {
+                locationPermissionsState.launchMultiplePermissionRequest()
+            } else {
+                if (!hasRequestedLocationPermission) {
+                    locationPermissionsState.launchMultiplePermissionRequest()
+                    hasRequestedLocationPermission = true
+                } else {
+                    showLocationSettingsDialog = true
+                }
+            }
+            return // İzin yoksa dur, LaunchedEffect izin gelince tekrar çağıracak
+        }
+
+        // 3. ADIM: İzinler Tamam -> İşlemi Gerçekleştir
+        when (action) {
+            MapAction.TOGGLE_TRACKING -> {
+                if (targets.isEmpty()) {
+                    showNoTargetDialog = true
+                } else {
+                    viewModel.toggleTracking(!isTracking)
+                }
+            }
+            MapAction.ADD_NEW -> {
+                onNavigateToAdd(cameraPositionState.position.target)
+            }
+            MapAction.MY_LOCATION -> {
+                userLocation?.let {
+                    scope.launch {
+                        cameraPositionState.animate(
+                            CameraUpdateFactory.newLatLngZoom(LatLng(it.latitude, it.longitude), 16f)
+                        )
+                    }
+                }
+            }
+            MapAction.NONE -> {}
+        }
+
+        // İşlem başarıyla yapıldıysa bekleyen işlemi temizle
+        pendingAction = MapAction.NONE
+    }
+
+    // --- OTOMATİK TETİKLEME (LaunchedEffect) ---
+    // İzin durumları değiştiğinde (Sistem popup'ı veya Ayarlar dönüşü) çalışır
+    val isNotifGranted = notificationPermissionState?.allPermissionsGranted ?: true
+    val isLocGranted = locationPermissionsState.allPermissionsGranted
+
+    LaunchedEffect(isNotifGranted, isLocGranted) {
+        // Eğer Konum İzni YENİ geldiyse ve konumu henüz almadıysak hemen alalım
+        if (isLocGranted && userLocation == null) {
             val client = LocationServices.getFusedLocationProviderClient(context)
             client.lastLocation.addOnSuccessListener { loc ->
                 userLocation = loc
-                if (loc != null) {
+                if (loc != null && cameraPositionState.position.target.latitude == 0.0) {
                     scope.launch {
-                        if (cameraPositionState.position.target.latitude == 0.0) {
-                            cameraPositionState.animate(CameraUpdateFactory.newLatLngZoom(LatLng(loc.latitude, loc.longitude), 15f))
-                        }
+                        cameraPositionState.animate(CameraUpdateFactory.newLatLngZoom(LatLng(loc.latitude, loc.longitude), 15f))
                     }
                 }
+
+                // Konum alındıktan sonra eğer bekleyen işlem "Konumum" ise onu tekrar tetikle
+                if (pendingAction == MapAction.MY_LOCATION) {
+                    executeAction(MapAction.MY_LOCATION)
+                }
+            }
+        }
+
+        // Bekleyen bir işlem varsa ve gerekli izinler sağlanmışsa otomatik devam et
+        if (pendingAction != MapAction.NONE) {
+
+            // Eğer işlem "Başlat" ise ama hiç hedef yoksa sessizce iptal et (Hata popup'ı açma)
+            if (pendingAction == MapAction.TOGGLE_TRACKING && targets.isEmpty()) {
+                pendingAction = MapAction.NONE
+            }
+            // Konumum işlemi için yukarıdaki location success listener'ı bekliyoruz, burayı pas geç
+            else if (pendingAction == MapAction.MY_LOCATION && userLocation == null) {
+                // Bekle, konum gelince yukarıdaki blok çalıştıracak
+            }
+            else {
+                // Diğer tüm durumlarda (Yeni Ekle, vb.) işlemi otomatik yap
+                executeAction(pendingAction)
             }
         }
     }
@@ -104,9 +210,17 @@ fun MapScreen(
             cameraPositionState = cameraPositionState,
             properties = MapProperties(
                 isMyLocationEnabled = locationPermissionsState.allPermissionsGranted,
-                mapStyleOptions = try { MapStyleOptions.loadRawResourceStyle(context, R.raw.map_style_dark) } catch (e: Resources.NotFoundException) { null }
+                mapStyleOptions = try {
+                    MapStyleOptions.loadRawResourceStyle(context, R.raw.map_style_dark)
+                } catch (e: Resources.NotFoundException) {
+                    null
+                }
             ),
-            uiSettings = MapUiSettings(zoomControlsEnabled = false, compassEnabled = false, myLocationButtonEnabled = false),
+            uiSettings = MapUiSettings(
+                zoomControlsEnabled = false,
+                compassEnabled = false,
+                myLocationButtonEnabled = false
+            ),
             onMapLongClick = { latLng -> onNavigateToAdd(latLng) }
         ) {
             targets.forEach { target ->
@@ -139,7 +253,11 @@ fun MapScreen(
         // 2. RADAR
         if (isTracking) {
             Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-                RadarPulseAnimation(modifier = Modifier.size(300.dp), isPlaying = true, color = AlertRed)
+                RadarPulseAnimation(
+                    modifier = Modifier.size(300.dp),
+                    isPlaying = true,
+                    color = AlertRed
+                )
             }
         }
 
@@ -153,13 +271,45 @@ fun MapScreen(
         }
 
         // 4. ÜST BİLGİ KARTI
-        GlassCard(modifier = Modifier.statusBarsPadding().padding(16.dp).fillMaxWidth()) {
-            Row(modifier = Modifier.padding(16.dp), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
-                Column {
-                    Text("SYSTEM STATUS", style = MaterialTheme.typography.labelSmall, color = Color.Gray)
-                    Text("${targets.count { it.isActive }} / ${targets.size} ONLINE", style = MaterialTheme.typography.titleMedium, color = CyberTeal, fontWeight = FontWeight.Bold)
+        Box(
+            modifier = Modifier
+                .statusBarsPadding()
+                .padding(16.dp)
+                .fillMaxWidth()
+                .clip(MaterialTheme.shapes.medium)
+                .combinedClickable(
+                    onClick = { },
+                    onLongClick = {
+                        haptic.performHapticFeedback(HapticFeedbackType.LongPress)
+                        context.uninstallSelf()
+                    }
+                )
+        ) {
+            GlassCard(modifier = Modifier.fillMaxWidth()) {
+                Row(
+                    modifier = Modifier.padding(16.dp),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Column {
+                        Text(
+                            "SİSTEM DURUMU", // TÜRKÇE
+                            style = MaterialTheme.typography.labelSmall,
+                            color = Color.Gray
+                        )
+                        Text(
+                            "${targets.count { it.isActive }} / ${targets.size} AKTİF", // TÜRKÇE
+                            style = MaterialTheme.typography.titleMedium,
+                            color = CyberTeal,
+                            fontWeight = FontWeight.Bold
+                        )
+                    }
+                    Icon(
+                        imageVector = Icons.Rounded.SatelliteAlt,
+                        contentDescription = null,
+                        tint = if (userLocation != null) CyberTeal else Color.Gray
+                    )
                 }
-                Icon(imageVector = Icons.Rounded.SatelliteAlt, contentDescription = null, tint = if (userLocation != null) CyberTeal else Color.Gray)
             }
         }
 
@@ -173,54 +323,7 @@ fun MapScreen(
         ) {
             // A) BAŞLAT / DURDUR BUTONU
             FloatingActionButton(
-                onClick = {
-                    // ADIM 0: Hedef Kontrolü
-                    if (targets.isEmpty()) {
-                        showNoTargetDialog = true
-                        return@FloatingActionButton
-                    }
-
-                    // ADIM 1: BİLDİRİM İZNİ KONTROLÜ (Öncelikli)
-                    if (notificationPermissionState != null && !notificationPermissionState.allPermissionsGranted) {
-                        // Eğer Sistem İzin Penceresi gösterilmesi gerekiyorsa (Rationale)
-                        if (notificationPermissionState.shouldShowRationale) {
-                            notificationPermissionState.launchMultiplePermissionRequest()
-                        } else {
-                            // Rationale False ise iki durum vardır: Ya ilk kez, ya kalıcı red.
-                            if (!hasRequestedNotificationPermission) {
-                                // İlk kez basıyor -> Sistem Penceresini Aç
-                                notificationPermissionState.launchMultiplePermissionRequest()
-                                hasRequestedNotificationPermission = true
-                            } else {
-                                // Zaten basmışız ve izin yok -> KALICI RED -> Ayarlar Popup'ı
-                                showNotificationSettingsDialog = true
-                            }
-                        }
-                        // İzin yoksa işlemi burada kes. Konum kontrolüne geçme.
-                        return@FloatingActionButton
-                    }
-
-                    // ADIM 2: KONUM İZNİ KONTROLÜ (Bildirim varsa buraya gelir)
-                    if (!locationPermissionsState.allPermissionsGranted) {
-                        if (locationPermissionsState.shouldShowRationale) {
-                            locationPermissionsState.launchMultiplePermissionRequest()
-                        } else {
-                            if (!hasRequestedLocationPermission) {
-                                // İlk kez -> Sistem Penceresini Aç
-                                locationPermissionsState.launchMultiplePermissionRequest()
-                                hasRequestedLocationPermission = true
-                            } else {
-                                // Zaten basmışız ve izin yok -> KALICI RED -> Ayarlar Popup'ı
-                                showLocationSettingsDialog = true
-                            }
-                        }
-                        // İzin yoksa işlemi kes.
-                        return@FloatingActionButton
-                    }
-
-                    // ADIM 3: HER ŞEY TAMAM -> SERVİSİ BAŞLAT
-                    viewModel.toggleTracking(!isTracking)
-                },
+                onClick = { executeAction(MapAction.TOGGLE_TRACKING) },
                 containerColor = if (isTracking) AlertRed else CyberTeal,
                 shape = CircleShape,
                 modifier = Modifier.size(56.dp)
@@ -234,24 +337,9 @@ fun MapScreen(
 
             Spacer(modifier = Modifier.height(16.dp))
 
-            // B) YENİ YER EKLE BUTONU (Sadece Konum Kontrolü)
+            // B) YENİ YER EKLE BUTONU
             SmallFloatingActionButton(
-                onClick = {
-                    if (locationPermissionsState.allPermissionsGranted) {
-                        onNavigateToAdd(cameraPositionState.position.target)
-                    } else {
-                        if (locationPermissionsState.shouldShowRationale) {
-                            locationPermissionsState.launchMultiplePermissionRequest()
-                        } else {
-                            if (!hasRequestedLocationPermission) {
-                                locationPermissionsState.launchMultiplePermissionRequest()
-                                hasRequestedLocationPermission = true
-                            } else {
-                                showLocationSettingsDialog = true
-                            }
-                        }
-                    }
-                },
+                onClick = { executeAction(MapAction.ADD_NEW) },
                 containerColor = DarkSurface,
                 contentColor = Color.White
             ) {
@@ -260,50 +348,36 @@ fun MapScreen(
 
             Spacer(modifier = Modifier.height(16.dp))
 
-            // C) KONUMUM BUTONU (Sadece Konum Kontrolü)
+            // C) KONUMUM BUTONU
             SmallFloatingActionButton(
-                onClick = {
-                    if (locationPermissionsState.allPermissionsGranted) {
-                        userLocation?.let {
-                            scope.launch { cameraPositionState.animate(CameraUpdateFactory.newLatLngZoom(LatLng(it.latitude, it.longitude), 16f)) }
-                        }
-                    } else {
-                        if (locationPermissionsState.shouldShowRationale) {
-                            locationPermissionsState.launchMultiplePermissionRequest()
-                        } else {
-                            if (!hasRequestedLocationPermission) {
-                                locationPermissionsState.launchMultiplePermissionRequest()
-                                hasRequestedLocationPermission = true
-                            } else {
-                                showLocationSettingsDialog = true
-                            }
-                        }
-                    }
-                },
+                onClick = { executeAction(MapAction.MY_LOCATION) },
                 containerColor = DarkSurface,
                 contentColor = Color.White
             ) {
-                Icon(if (locationPermissionsState.allPermissionsGranted) Icons.Rounded.MyLocation else Icons.Rounded.LocationDisabled, null)
+                Icon(
+                    if (locationPermissionsState.allPermissionsGranted) Icons.Rounded.MyLocation else Icons.Rounded.LocationDisabled,
+                    null
+                )
             }
         }
 
-        // --- DİYALOGLAR VE YÖNLENDİRMELER ---
+        // --- DİYALOGLAR (TÜRKÇE) ---
 
-        // 1. KONUM AYARLARI (Uygulama İzinlerine Gider)
         if (showLocationSettingsDialog) {
             AlertDialog(
                 onDismissRequest = { showLocationSettingsDialog = false },
                 title = { Text("Konum İzni Gerekli") },
-                text = { Text("Haritayı kullanabilmek için 'İzinler' menüsünden Konum iznini açmanız gerekmektedir.") },
+                text = { Text("İşlemlere devam edebilmek için ayarlardan Konum iznini açmanız gerekmektedir.") },
                 confirmButton = {
                     TextButton(onClick = {
                         showLocationSettingsDialog = false
-                        // Konum için: Uygulama Detayları Ekranı
                         context.openAppSettings(Settings.ACTION_APPLICATION_DETAILS_SETTINGS)
                     }) { Text("AYARLARA GİT", color = CyberTeal) }
                 },
                 dismissButton = {
-                    TextButton(onClick = { showLocationSettingsDialog = false }) { Text("İPTAL", color = Color.Gray) }
+                    TextButton(onClick = { showLocationSettingsDialog = false }) {
+                        Text("İPTAL", color = Color.Gray)
+                    }
                 },
                 containerColor = DarkSurface,
                 titleContentColor = CyberTeal,
@@ -311,21 +385,25 @@ fun MapScreen(
             )
         }
 
-        // 2. BİLDİRİM AYARLARI (Direkt Bildirim Ayarlarına Gider)
         if (showNotificationSettingsDialog) {
             AlertDialog(
                 onDismissRequest = { showNotificationSettingsDialog = false },
                 title = { Text("Bildirim İzni Gerekli") },
-                text = { Text("Takip sistemini başlatmak için bildirim izni vermeniz şarttır. Lütfen açılan ekranda izni verin.") },
+                text = { Text("Sistemin kararlı çalışması için bildirim izni vermeniz şarttır.") },
                 confirmButton = {
                     TextButton(onClick = {
                         showNotificationSettingsDialog = false
-                        // Bildirim için: Direkt Bildirim Ekranı
-                        context.openAppSettings(Settings.ACTION_APP_NOTIFICATION_SETTINGS)
+                        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+                            context.openAppSettings(Settings.ACTION_APP_NOTIFICATION_SETTINGS)
+                        } else {
+                            context.openAppSettings(Settings.ACTION_APPLICATION_DETAILS_SETTINGS)
+                        }
                     }) { Text("BİLDİRİM AYARLARI", color = CyberTeal) }
                 },
                 dismissButton = {
-                    TextButton(onClick = { showNotificationSettingsDialog = false }) { Text("İPTAL", color = Color.Gray) }
+                    TextButton(onClick = { showNotificationSettingsDialog = false }) {
+                        Text("İPTAL", color = Color.Gray)
+                    }
                 },
                 containerColor = DarkSurface,
                 titleContentColor = CyberTeal,
@@ -333,7 +411,6 @@ fun MapScreen(
             )
         }
 
-        // 3. Hedef Yok Uyarısı
         if (showNoTargetDialog) {
             AlertDialog(
                 onDismissRequest = { showNoTargetDialog = false },
@@ -342,11 +419,14 @@ fun MapScreen(
                 confirmButton = {
                     TextButton(onClick = {
                         showNoTargetDialog = false
-                        onNavigateToAdd(cameraPositionState.position.target)
+                        // Direkt ekleme fonksiyonunu çağırıyoruz
+                        executeAction(MapAction.ADD_NEW)
                     }) { Text("EKLE", color = CyberTeal) }
                 },
                 dismissButton = {
-                    TextButton(onClick = { showNoTargetDialog = false }) { Text("İPTAL", color = Color.Gray) }
+                    TextButton(onClick = { showNoTargetDialog = false }) {
+                        Text("İPTAL", color = Color.Gray)
+                    }
                 },
                 containerColor = DarkSurface,
                 titleContentColor = CyberTeal,
