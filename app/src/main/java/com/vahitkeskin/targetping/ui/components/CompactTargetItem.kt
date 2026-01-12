@@ -18,6 +18,7 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.scale
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import com.vahitkeskin.targetping.domain.model.TargetLocation
 
@@ -27,12 +28,13 @@ private val CardBackground = Color(0xFF1E1E1E)
 
 @Composable
 fun CompactTargetItem(
+    modifier: Modifier = Modifier, // Dışarıdan gelen modifier (Animasyon vb. için)
     target: TargetLocation,
-    userLocation: Location?, // Uzaklık hesaplamak için (Haritada var, listede null olabilir)
+    userLocation: Location?,
     onToggle: () -> Unit,
     onClick: () -> Unit
 ) {
-    // Mesafe Hesabı (Eğer konum bilgisi geldiyse)
+    // Mesafe Hesabı
     val distanceStr = remember(userLocation, target) {
         if (userLocation == null) "---"
         else {
@@ -49,8 +51,9 @@ fun CompactTargetItem(
         }
     }
 
+    // Root element (Row) artık dışarıdan gelen modifier'ı kullanıyor
     Row(
-        modifier = Modifier
+        modifier = modifier // <--- DÜZELTME BURADA: Dışarıdan gelen modifier eklendi
             .fillMaxWidth()
             .clip(RoundedCornerShape(16.dp))
             .background(CardBackground)
@@ -64,7 +67,7 @@ fun CompactTargetItem(
             modifier = Modifier
                 .size(48.dp)
                 .clip(RoundedCornerShape(12.dp))
-                .background(if (target.isActive) CyberTeal.copy(0.1f) else Color.Gray.copy(0.1f)),
+                .background(if (target.isActive) CyberTeal.copy(0.15f) else Color.Gray.copy(0.1f)),
             contentAlignment = Alignment.Center
         ) {
             Icon(
@@ -78,17 +81,20 @@ fun CompactTargetItem(
 
         // Orta Bilgi Alanı
         Column(modifier = Modifier.weight(1f)) {
+            // İsim (Taşmayı önlemek için maxLines eklendi)
             Text(
                 text = target.name,
                 style = MaterialTheme.typography.titleMedium,
                 color = Color.White,
-                fontWeight = FontWeight.Bold
+                fontWeight = FontWeight.Bold,
+                maxLines = 1, // Uzun isimleri kes
+                overflow = TextOverflow.Ellipsis
             )
 
             Spacer(modifier = Modifier.height(4.dp))
 
             Row(verticalAlignment = Alignment.CenterVertically) {
-                // Eğer konum varsa mesafeyi göster
+                // Konum varsa mesafe
                 if (userLocation != null) {
                     Icon(Icons.Rounded.Straighten, null, tint = Color.Gray, modifier = Modifier.size(12.dp))
                     Spacer(modifier = Modifier.width(4.dp))
@@ -98,10 +104,10 @@ fun CompactTargetItem(
                         color = CyberTeal,
                         fontWeight = FontWeight.Bold
                     )
-                    Text(text = " • ", color = Color.Gray)
+                    Text(text = " • ", color = Color.Gray, style = MaterialTheme.typography.bodySmall)
                 }
 
-                // Yarıçap Bilgisi
+                // Yarıçap
                 Text(
                     text = "RAD: ${target.radiusMeters}M",
                     style = MaterialTheme.typography.bodySmall,

@@ -1,8 +1,6 @@
 package com.vahitkeskin.targetping.ui.home
 
-import androidx.compose.animation.AnimatedVisibility
-import androidx.compose.animation.slideInVertically
-import androidx.compose.animation.slideOutVertically
+import androidx.compose.animation.Crossfade
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
@@ -23,14 +21,13 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
-import androidx.navigation.NavDestination.Companion.hasRoute
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
-import androidx.navigation.compose.currentBackStackEntryAsState
 import androidx.navigation.compose.rememberNavController
 import androidx.navigation.toRoute
 import com.vahitkeskin.targetping.ui.features.add_edit.AddEditScreen
 import com.vahitkeskin.targetping.ui.features.map.MapScreen
+import com.vahitkeskin.targetping.ui.features.stealth.CalculatorScreen
 import com.vahitkeskin.targetping.ui.features.targets.TargetsListScreen
 import com.vahitkeskin.targetping.ui.navigation.Screen
 import kotlinx.coroutines.launch
@@ -43,44 +40,48 @@ private val GlassBackground = Color(0xFF1E1E1E).copy(alpha = 0.95f)
 fun MainScreen(
     viewModel: HomeViewModel = hiltViewModel()
 ) {
+    val isStealthMode by viewModel.isStealthMode.collectAsState()
     val navController = rememberNavController()
-    val navBackStackEntry by navController.currentBackStackEntryAsState()
-    val currentDestination = navBackStackEntry?.destination
 
-    val isBottomBarVisible = currentDestination?.hasRoute<Screen.Dashboard>() == true
-
-    Scaffold(
-        containerColor = Color.Black,
-        // DİKKAT: Ana Scaffold'a da insets'leri sıfırla diyoruz.
-        contentWindowInsets = WindowInsets(0.dp),
-        bottomBar = {
-            // Burası boş, Dashboard içinde yönetiyoruz.
-        }
-    ) { paddingValues ->
-        // paddingValues'u bilerek kullanmıyoruz (yoksayıyoruz)
-        // böylece içerik ekranın en tepesinden başlıyor.
-
-        NavHost(
-            navController = navController,
-            startDestination = Screen.Dashboard,
-            modifier = Modifier.fillMaxSize()
-        ) {
-            composable<Screen.Dashboard> {
-                DashboardScreen(
-                    viewModel = viewModel,
-                    onNavigateToAdd = { id ->
-                        navController.navigate(Screen.AddEdit(targetId = id))
+    Crossfade(targetState = isStealthMode, label = "StealthTransition") { stealthActive ->
+        if (stealthActive) {
+            // Gizli Mod
+            CalculatorScreen(
+                onUnlock = { viewModel.setStealthMode(false) }
+            )
+        } else {
+            // Normal Mod
+            Scaffold(
+                containerColor = Color.Black,
+                // KRİTİK AYAR 1: İçeriğin en tepeden (Status bar arkasından) başlamasını sağlar
+                contentWindowInsets = WindowInsets(0.dp),
+                bottomBar = { /* Dashboard içinde yönetiliyor */ }
+            ) { paddingValues ->
+                // paddingValues bilerek kullanılmıyor (Fullscreen)
+                NavHost(
+                    navController = navController,
+                    startDestination = Screen.Dashboard,
+                    modifier = Modifier.fillMaxSize()
+                ) {
+                    composable<Screen.Dashboard> {
+                        DashboardScreen(
+                            viewModel = viewModel,
+                            onNavigateToAdd = { id ->
+                                navController.navigate(Screen.AddEdit(targetId = id))
+                            },
+                            onPanic = { viewModel.setStealthMode(true) }
+                        )
                     }
-                )
-            }
 
-            composable<Screen.AddEdit> { backStackEntry ->
-                val args = backStackEntry.toRoute<Screen.AddEdit>()
-                AddEditScreen(
-                    viewModel = viewModel,
-                    targetId = args.targetId,
-                    onBack = { navController.popBackStack() }
-                )
+                    composable<Screen.AddEdit> { backStackEntry ->
+                        val args = backStackEntry.toRoute<Screen.AddEdit>()
+                        AddEditScreen(
+                            viewModel = viewModel,
+                            targetId = args.targetId,
+                            onBack = { navController.popBackStack() }
+                        )
+                    }
+                }
             }
         }
     }
@@ -90,44 +91,37 @@ fun MainScreen(
 @Composable
 fun DashboardScreen(
     viewModel: HomeViewModel,
-    onNavigateToAdd: (String?) -> Unit
+    onNavigateToAdd: (String?) -> Unit,
+    onPanic: () -> Unit
 ) {
     val pagerState = rememberPagerState(pageCount = { 2 })
     val scope = rememberCoroutineScope()
-
-    // MANTIK: Eğer şu anki sayfa 0 (Harita) ise kaydırmayı (userScroll) KAPAT.
-    // Değilse (yani Liste ise) AÇ.
     val isScrollEnabled = pagerState.currentPage != 0
 
-    Scaffold(
-        containerColor = Color.Transparent,
-        contentWindowInsets = WindowInsets(0.dp),
-        bottomBar = {
-            GlassBottomNavigation(
-                currentPage = pagerState.currentPage,
-                onTabSelected = { index ->
-                    scope.launch { pagerState.animateScrollToPage(index) }
-                }
-            )
-        }
-    ) { padding ->
-
+    // Scaffold yerine Box kullanıyoruz ki tam kontrol bizde olsun.
+    // Böylece harita ve liste tam ekran yayılırken, BottomBar onların "üzerinde" yüzer.
+    Box(
+        modifier = Modifier.fillMaxSize()
+    ) {
+        // 1. İÇERİK (Pager)
         HorizontalPager(
             state = pagerState,
             modifier = Modifier.fillMaxSize(),
-            // KRİTİK AYAR BURASI:
             userScrollEnabled = isScrollEnabled
         ) { page ->
             when (page) {
                 0 -> {
-                    // HARİTA
+                    // HARİTA (Tam Ekran)
                     MapScreen(
                         viewModel = viewModel,
                         onNavigateToAdd = { _ -> onNavigateToAdd(null) }
+                        // MapScreen içine onPanic eklediysen buraya: onPanic = onPanic
                     )
                 }
                 1 -> {
-                    // LİSTE
+                    // LİSTE (Tam Ekran - Status Bar arkasından başlar)
+                    // NOT: TargetsListScreen içinde Scaffold varsa onun da
+                    // contentWindowInsets = WindowInsets(0.dp) olduğundan emin ol.
                     Box(modifier = Modifier.fillMaxSize()) {
                         TargetsListScreen(
                             viewModel = viewModel,
@@ -138,21 +132,32 @@ fun DashboardScreen(
                 }
             }
         }
+
+        // 2. ALT MENÜ (Glass Bottom Bar)
+        // Box içinde en alta hizalıyoruz.
+        GlassBottomNavigation(
+            modifier = Modifier.align(Alignment.BottomCenter),
+            currentPage = pagerState.currentPage,
+            onTabSelected = { index ->
+                scope.launch { pagerState.animateScrollToPage(index) }
+            }
+        )
     }
 }
 
-// --- GlassBottomNavigation ve CyberNavItem KODLARI AYNIDIR ---
-// (Önceki cevaptaki kodların aynısını buraya ekleyebilirsin)
-// Yer kaplamaması için tekrar yazmıyorum, kopyaladığın son hali geçerlidir.
 @Composable
 fun GlassBottomNavigation(
+    modifier: Modifier = Modifier,
     currentPage: Int,
     onTabSelected: (Int) -> Unit
 ) {
     Box(
-        modifier = Modifier
+        modifier = modifier
             .fillMaxWidth()
-            .padding(start = 16.dp, end = 16.dp, bottom = 32.dp)
+            // KRİTİK AYAR 2: Navigation Bar (Sistem alt çizgisi) kadar yukarı iter.
+            // Böylece Bottom Bar sistem çizgisinin üstünde kalır.
+            .windowInsetsPadding(WindowInsets.navigationBars)
+            .padding(horizontal = 16.dp) // Görsel boşluk
             .height(70.dp)
             .clip(RoundedCornerShape(32.dp))
             .background(GlassBackground)
@@ -175,9 +180,16 @@ fun CyberNavItem(icon: ImageVector, label: String, isSelected: Boolean, onClick:
     Column(
         horizontalAlignment = Alignment.CenterHorizontally,
         verticalArrangement = Arrangement.Center,
-        modifier = Modifier.fillMaxHeight().clip(CircleShape).clickable { onClick() }.padding(horizontal = 24.dp)
+        modifier = Modifier
+            .fillMaxHeight()
+            .clip(CircleShape)
+            .clickable { onClick() }
+            .padding(horizontal = 24.dp)
     ) {
         Icon(icon, label, tint = color, modifier = Modifier.size(26.dp))
-        if (isSelected) { Spacer(Modifier.height(4.dp)); Text(label, style = MaterialTheme.typography.labelSmall, color = color) }
+        if (isSelected) {
+            Spacer(Modifier.height(4.dp))
+            Text(label, style = MaterialTheme.typography.labelSmall, color = color)
+        }
     }
 }

@@ -15,8 +15,8 @@ class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
 
-        // KRİTİK AYAR: Hem üst hem alt barı tamamen şeffaf yapıyoruz.
-        // SystemBarStyle.dark kullanıyoruz ki ikonlar (saat vs) beyaz olsun.
+        // Status bar (Üst) ve Navigation bar (Alt) ikonlarını BEYAZ yapar.
+        // Arka planlarını tamamen şeffaf yapar.
         enableEdgeToEdge(
             statusBarStyle = SystemBarStyle.dark(Color.TRANSPARENT),
             navigationBarStyle = SystemBarStyle.dark(Color.TRANSPARENT)
@@ -24,6 +24,7 @@ class MainActivity : ComponentActivity() {
 
         setContent {
             TargetPingTheme {
+                // Artık navigasyonu ve gizli modu yöneten MainScreen açılıyor
                 MainScreen()
             }
         }
