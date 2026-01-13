@@ -9,10 +9,12 @@ import androidx.activity.enableEdgeToEdge
 import com.vahitkeskin.targetping.ui.home.MainScreen
 import com.vahitkeskin.targetping.ui.theme.TargetPingTheme
 import dagger.hilt.android.AndroidEntryPoint
+import androidx.core.splashscreen.SplashScreen.Companion.installSplashScreen
 
 @AndroidEntryPoint
 class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
+        installSplashScreen()
         super.onCreate(savedInstanceState)
 
         // Status bar (Üst) ve Navigation bar (Alt) ikonlarını BEYAZ yapar.
@@ -24,7 +26,7 @@ class MainActivity : ComponentActivity() {
 
         setContent {
             TargetPingTheme {
-                // Artık navigasyonu ve gizli modu yöneten MainScreen açılıyor
+                // Navigasyon yapısı içinde Splash ekranını yöneteceğiz
                 MainScreen()
             }
         }

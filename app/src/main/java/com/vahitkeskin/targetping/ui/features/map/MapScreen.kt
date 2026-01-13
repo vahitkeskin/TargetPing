@@ -7,12 +7,41 @@ import android.content.res.Resources
 import android.location.Location
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.combinedClickable
-import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.navigationBarsPadding
+import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.rounded.*
-import androidx.compose.material3.*
-import androidx.compose.runtime.*
+import androidx.compose.material.icons.rounded.Add
+import androidx.compose.material.icons.rounded.LocationDisabled
+import androidx.compose.material.icons.rounded.MyLocation
+import androidx.compose.material.icons.rounded.PlayArrow
+import androidx.compose.material.icons.rounded.SatelliteAlt
+import androidx.compose.material.icons.rounded.Stop
+import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.FloatingActionButton
+import androidx.compose.material3.Icon
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.SmallFloatingActionButton
+import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
+import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.collectAsState
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -28,19 +57,24 @@ import com.google.android.gms.maps.CameraUpdateFactory
 import com.google.android.gms.maps.model.BitmapDescriptorFactory
 import com.google.android.gms.maps.model.LatLng
 import com.google.android.gms.maps.model.MapStyleOptions
-import com.google.maps.android.compose.*
+import com.google.maps.android.compose.Circle
+import com.google.maps.android.compose.GoogleMap
+import com.google.maps.android.compose.MapProperties
+import com.google.maps.android.compose.MapUiSettings
+import com.google.maps.android.compose.Marker
+import com.google.maps.android.compose.MarkerState
+import com.google.maps.android.compose.rememberCameraPositionState
 import com.vahitkeskin.targetping.R
 import com.vahitkeskin.targetping.ui.components.CompassOverlay
 import com.vahitkeskin.targetping.ui.features.add_edit.GlassCard
 import com.vahitkeskin.targetping.ui.home.HomeViewModel
 import com.vahitkeskin.targetping.ui.home.components.RadarPulseAnimation
-import com.vahitkeskin.targetping.utils.rememberPermissionAction // YENİ IMPORT
+import com.vahitkeskin.targetping.ui.theme.AlertRed
+import com.vahitkeskin.targetping.ui.theme.PrimaryColor
+import com.vahitkeskin.targetping.ui.theme.SurfaceColor
+import com.vahitkeskin.targetping.utils.rememberPermissionAction
 import com.vahitkeskin.targetping.utils.uninstallSelf
 import kotlinx.coroutines.launch
-
-private val CyberTeal = Color(0xFF00E5FF)
-private val AlertRed = Color(0xFFFF2A68)
-private val DarkSurface = Color(0xFF121212)
 
 @SuppressLint("MissingPermission")
 @OptIn(ExperimentalFoundationApi::class)
@@ -147,7 +181,7 @@ fun MapScreen(
         ) {
             targets.forEach { target ->
                 val markerHue = if (target.isActive) 180f else 0f
-                val circleColor = if (target.isActive) CyberTeal else Color.Gray
+                val circleColor = if (target.isActive) PrimaryColor else Color.Gray
                 val circleAlpha = if (target.isActive) 0.15f else 0.05f
                 val strokeAlpha = if (target.isActive) 0.8f else 0.3f
 
@@ -222,14 +256,14 @@ fun MapScreen(
                         Text(
                             "${targets.count { it.isActive }} / ${targets.size} AKTİF",
                             style = MaterialTheme.typography.titleMedium,
-                            color = CyberTeal,
+                            color = PrimaryColor,
                             fontWeight = FontWeight.Bold
                         )
                     }
                     Icon(
                         imageVector = Icons.Rounded.SatelliteAlt,
                         contentDescription = null,
-                        tint = if (userLocation != null) CyberTeal else Color.Gray
+                        tint = if (userLocation != null) PrimaryColor else Color.Gray
                     )
                 }
             }
@@ -247,7 +281,7 @@ fun MapScreen(
             // A) BAŞLAT / DURDUR
             FloatingActionButton(
                 onClick = onToggleClick, // DİREKT AKSİYON VERİYORUZ
-                containerColor = if (isTracking) AlertRed else CyberTeal,
+                containerColor = if (isTracking) AlertRed else PrimaryColor,
                 shape = CircleShape,
                 modifier = Modifier.size(56.dp)
             ) {
@@ -263,7 +297,7 @@ fun MapScreen(
             // B) EKLEME
             SmallFloatingActionButton(
                 onClick = onAddClick, // DİREKT AKSİYON
-                containerColor = DarkSurface,
+                containerColor = SurfaceColor,
                 contentColor = Color.White
             ) {
                 Icon(Icons.Rounded.Add, null)
@@ -274,7 +308,7 @@ fun MapScreen(
             // C) KONUMUM
             SmallFloatingActionButton(
                 onClick = onMyLocationClick, // DİREKT AKSİYON
-                containerColor = DarkSurface,
+                containerColor = SurfaceColor,
                 contentColor = Color.White
             ) {
                 Icon(
@@ -295,15 +329,15 @@ fun MapScreen(
                         showNoTargetDialog = false
                         // Konum izni zaten alınmış olacağı için direkt fonksiyonu çağırıyoruz
                         onNavigateToAdd(cameraPositionState.position.target)
-                    }) { Text("EKLE", color = CyberTeal) }
+                    }) { Text("EKLE", color = PrimaryColor) }
                 },
                 dismissButton = {
                     TextButton(onClick = { showNoTargetDialog = false }) {
                         Text("İPTAL", color = Color.Gray)
                     }
                 },
-                containerColor = DarkSurface,
-                titleContentColor = CyberTeal,
+                containerColor = SurfaceColor,
+                titleContentColor = PrimaryColor,
                 textContentColor = Color.White
             )
         }

@@ -25,9 +25,7 @@ import com.google.accompanist.permissions.*
 import com.vahitkeskin.targetping.ui.features.add_edit.GlassCard
 import com.vahitkeskin.targetping.ui.home.HomeViewModel
 import com.vahitkeskin.targetping.utils.openAppSettings
-
-private val CyberTeal = Color(0xFF00E5FF)
-private val DarkBackground = Color(0xFF0A0A0A)
+import com.vahitkeskin.targetping.ui.theme.*
 
 @OptIn(ExperimentalPermissionsApi::class)
 @Composable
@@ -73,7 +71,7 @@ fun SettingsScreen(viewModel: HomeViewModel) {
 
         // Başlık Alanı
         Row(verticalAlignment = Alignment.CenterVertically) {
-            Icon(Icons.Rounded.Settings, null, tint = CyberTeal)
+            Icon(Icons.Rounded.Settings, null, tint = PrimaryColor)
             Spacer(Modifier.width(8.dp))
             Text(
                 "SİSTEM AYARLARI",
@@ -195,7 +193,7 @@ fun SettingsScreen(viewModel: HomeViewModel) {
                         context.openAppSettings(action)
                         showSettingsRedirectDialog = null
                     }) {
-                        Text("AYARLARA GİT", color = CyberTeal, fontWeight = FontWeight.Bold)
+                        Text("AYARLARA GİT", color = PrimaryColor, fontWeight = FontWeight.Bold)
                     }
                 },
                 dismissButton = {
@@ -204,7 +202,7 @@ fun SettingsScreen(viewModel: HomeViewModel) {
                     }
                 },
                 containerColor = Color(0xFF1E1E1E),
-                titleContentColor = CyberTeal,
+                titleContentColor = PrimaryColor,
                 textContentColor = Color.White
             )
         }
@@ -216,7 +214,7 @@ fun SectionHeader(text: String) {
     Text(
         text = text,
         style = MaterialTheme.typography.labelSmall,
-        color = CyberTeal,
+        color = PrimaryColor,
         fontWeight = FontWeight.Bold,
         modifier = Modifier.padding(start = 4.dp, bottom = 4.dp)
     )
@@ -236,7 +234,7 @@ fun SettingsItem(
                 .padding(16.dp),
             verticalAlignment = Alignment.CenterVertically
         ) {
-            Icon(icon, null, tint = if(isChecked) CyberTeal else Color.Gray)
+            Icon(icon, null, tint = if(isChecked) PrimaryColor else Color.Gray)
             Spacer(Modifier.width(16.dp))
             Column(Modifier.weight(1f)) {
                 Text(title, color = Color.White, style = MaterialTheme.typography.titleSmall)
@@ -250,7 +248,7 @@ fun SettingsItem(
                 onCheckedChange = onCheckedChange,
                 colors = SwitchDefaults.colors(
                     checkedThumbColor = Color.Black,
-                    checkedTrackColor = CyberTeal,
+                    checkedTrackColor = PrimaryColor,
                     uncheckedThumbColor = Color.Gray,
                     uncheckedTrackColor = Color.Black.copy(alpha = 0.5f),
                     uncheckedBorderColor = Color.Gray
