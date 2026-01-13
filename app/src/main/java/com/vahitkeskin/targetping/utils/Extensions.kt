@@ -123,8 +123,6 @@ fun rememberPermissionAction(
         )
     }
 
-    // --- TRIGGER FUNCTION ---
-    // Bu fonksiyonu döndürüyoruz
     return {
         // 1. Adım: Bildirim
         if (isNotificationRequired && Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {

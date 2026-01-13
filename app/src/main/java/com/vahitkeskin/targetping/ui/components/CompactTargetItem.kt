@@ -4,12 +4,24 @@ import android.location.Location
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
-import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.rounded.Radar
 import androidx.compose.material.icons.rounded.Straighten
-import androidx.compose.material3.*
+import androidx.compose.material3.Icon
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.Switch
+import androidx.compose.material3.SwitchDefaults
+import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
@@ -21,10 +33,8 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import com.vahitkeskin.targetping.domain.model.TargetLocation
-
-// Renkler
-private val CyberTeal = Color(0xFF00E5FF)
-private val CardBackground = Color(0xFF1E1E1E)
+import com.vahitkeskin.targetping.ui.theme.PrimaryColor
+import com.vahitkeskin.targetping.ui.theme.SurfaceColor
 
 @Composable
 fun CompactTargetItem(
@@ -56,7 +66,7 @@ fun CompactTargetItem(
         modifier = modifier // <--- DÜZELTME BURADA: Dışarıdan gelen modifier eklendi
             .fillMaxWidth()
             .clip(RoundedCornerShape(16.dp))
-            .background(CardBackground)
+            .background(SurfaceColor)
             .border(1.dp, Color.White.copy(0.05f), RoundedCornerShape(16.dp))
             .clickable { onClick() }
             .padding(12.dp),
@@ -67,13 +77,13 @@ fun CompactTargetItem(
             modifier = Modifier
                 .size(48.dp)
                 .clip(RoundedCornerShape(12.dp))
-                .background(if (target.isActive) CyberTeal.copy(0.15f) else Color.Gray.copy(0.1f)),
+                .background(if (target.isActive) PrimaryColor.copy(0.15f) else Color.Gray.copy(0.1f)),
             contentAlignment = Alignment.Center
         ) {
             Icon(
                 imageVector = Icons.Rounded.Radar,
                 contentDescription = null,
-                tint = if (target.isActive) CyberTeal else Color.Gray
+                tint = if (target.isActive) PrimaryColor else Color.Gray
             )
         }
 
@@ -101,7 +111,7 @@ fun CompactTargetItem(
                     Text(
                         text = distanceStr,
                         style = MaterialTheme.typography.bodySmall,
-                        color = CyberTeal,
+                        color = PrimaryColor,
                         fontWeight = FontWeight.Bold
                     )
                     Text(text = " • ", color = Color.Gray, style = MaterialTheme.typography.bodySmall)
@@ -122,7 +132,7 @@ fun CompactTargetItem(
             onCheckedChange = { onToggle() },
             colors = SwitchDefaults.colors(
                 checkedThumbColor = Color.Black,
-                checkedTrackColor = CyberTeal,
+                checkedTrackColor = PrimaryColor,
                 uncheckedThumbColor = Color.Gray,
                 uncheckedTrackColor = Color.Black,
                 uncheckedBorderColor = Color.Gray
