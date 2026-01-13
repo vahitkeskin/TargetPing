@@ -8,9 +8,12 @@ import androidx.room.OnConflictStrategy
 import androidx.room.PrimaryKey
 import androidx.room.Query
 import androidx.room.RoomDatabase
+import com.vahitkeskin.targetping.data.local.dao.LogDao // Önceki adımda oluşturduğumuz DAO
+import com.vahitkeskin.targetping.data.local.entity.LogEntity // Önceki adımda oluşturduğumuz Entity
 import com.vahitkeskin.targetping.domain.model.TargetLocation
 import kotlinx.coroutines.flow.Flow
 
+// --- TARGET ENTITY ---
 @Entity(tableName = "targets")
 data class TargetEntity(
     @PrimaryKey val id: String,
@@ -19,10 +22,8 @@ data class TargetEntity(
     val longitude: Double,
     val radiusMeters: Int,
     val isActive: Boolean,
-    // Yeni eklenen alan (Varsayılan 0: Hiç tetiklenmedi)
     val lastTriggered: Long = 0
 ) {
-    // Entity -> Domain dönüşümü
     fun toDomain() = TargetLocation(
         id = id,
         name = name,
@@ -37,13 +38,12 @@ data class TargetEntity(
 fun TargetLocation.toEntity() =
     TargetEntity(id, name, latitude, longitude, radiusMeters, isActive, lastTriggered)
 
+// --- TARGET DAO ---
 @Dao
 interface TargetDao {
-    // RepositoryImpl içinde "dao.getAllTargetsFlow()" dedik, o yüzden isim bu olmalı:
     @Query("SELECT * FROM targets")
     fun getAllTargetsFlow(): Flow<List<TargetEntity>>
 
-    // RepositoryImpl içinde "dao.getAllTargetsOneShot()" dedik:
     @Query("SELECT * FROM targets")
     suspend fun getAllTargetsOneShot(): List<TargetEntity>
 
@@ -60,7 +60,8 @@ interface TargetDao {
     suspend fun updateTargetStatus(id: String, isActive: Boolean)
 }
 
-@Database(entities = [TargetEntity::class], version = 1)
+@Database(entities = [TargetEntity::class, LogEntity::class], version = 1)
 abstract class AppDatabase : RoomDatabase() {
-    abstract fun targetDao(): TargetDao // Bu fonksiyon ismi AppModule ile aynı olmalı
+    abstract fun targetDao(): TargetDao
+    abstract fun logDao(): LogDao // LogDao sisteme tanıtıldı
 }
