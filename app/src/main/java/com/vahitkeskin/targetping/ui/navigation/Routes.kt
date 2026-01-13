@@ -2,16 +2,17 @@ package com.vahitkeskin.targetping.ui.navigation
 
 import kotlinx.serialization.Serializable
 
-sealed interface Screen {
+sealed class Screen {
     @Serializable
-    data object Dashboard : Screen
+    object Dashboard : Screen()
 
     @Serializable
-    data object Map : Screen
+    data class AddEdit(val targetId: String?) : Screen()
+
+    // Düzeltme: object tanımlarında : Screen() parantezleri eklendi
+    @Serializable
+    object Logs : Screen()
 
     @Serializable
-    data object List : Screen
-
-    @Serializable
-    data class AddEdit(val targetId: String? = null) : Screen
+    object Settings : Screen()
 }
