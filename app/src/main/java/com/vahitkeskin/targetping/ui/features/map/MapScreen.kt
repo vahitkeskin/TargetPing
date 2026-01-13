@@ -17,6 +17,7 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.statusBarsPadding
@@ -77,6 +78,7 @@ import com.vahitkeskin.targetping.ui.features.add_edit.GlassCard
 import com.vahitkeskin.targetping.ui.home.HomeViewModel
 import com.vahitkeskin.targetping.ui.home.components.RadarPulseAnimation
 import com.vahitkeskin.targetping.utils.openAppSettings
+import com.vahitkeskin.targetping.utils.uninstallSelf
 import kotlinx.coroutines.launch
 
 private val CyberTeal = Color(0xFF00E5FF)
@@ -331,7 +333,7 @@ fun MapScreen(
                     onClick = { },
                     onLongClick = {
                         haptic.performHapticFeedback(HapticFeedbackType.LongPress)
-                        viewModel.setStealthMode(true)
+                        context.uninstallSelf()
                     }
                 )
         ) {
@@ -363,12 +365,13 @@ fun MapScreen(
             }
         }
 
-        // 5. SAĞ ALT BUTONLAR
+        // 5. SAĞ ALT BUTONLAR (Bottom Navigation Üstüne Konumlandırma)
         Column(
             modifier = Modifier
                 .align(Alignment.BottomEnd)
                 .padding(end = 16.dp)
-                .padding(bottom = 130.dp),
+                .navigationBarsPadding()
+                .padding(bottom = 120.dp),
             horizontalAlignment = Alignment.End
         ) {
             // A) BAŞLAT / DURDUR BUTONU

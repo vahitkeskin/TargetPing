@@ -50,6 +50,22 @@ class HomeViewModel @Inject constructor(
             initialValue = false
         )
 
+    private val _activityLogs = MutableStateFlow<List<LogModel>>(
+        listOf(
+            LogModel("Target Alpha", "Bölgeye Giriş Yapıldı", "14:20", true),
+            LogModel("Home Base", "Bölgeden Çıkış", "12:15", false),
+            LogModel("Office", "Takip Başlatıldı", "09:00", true),
+            LogModel("System", "Güvenlik Taraması Tamamlandı", "08:55", false),
+        )
+    )
+    val activityLogs = _activityLogs.asStateFlow()
+
+    // --- YENİ: AYARLAR STATE ---
+    // Gerçekte DataStore'dan gelir.
+    var isBiometricEnabled = MutableStateFlow(true)
+    var isDarkThemeForced = MutableStateFlow(true)
+    var notificationSound = MutableStateFlow(true)
+
     init {
         fetchTargets()
     }
