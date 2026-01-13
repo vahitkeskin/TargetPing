@@ -5,9 +5,11 @@ import android.content.Intent
 import android.os.Build
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.vahitkeskin.targetping.data.local.entity.LogEventType
 import com.vahitkeskin.targetping.data.service.LocationTrackingService
 import com.vahitkeskin.targetping.domain.model.TargetLocation
 import com.vahitkeskin.targetping.domain.repository.AppSettingsRepository
+import com.vahitkeskin.targetping.domain.repository.LogRepository
 import com.vahitkeskin.targetping.domain.repository.TargetRepository
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -21,6 +23,7 @@ import javax.inject.Inject
 @HiltViewModel
 class HomeViewModel @Inject constructor(
     private val repository: TargetRepository,
+    private val logRepository: LogRepository,
     private val settingsRepository: AppSettingsRepository,
     private val application: Application
 ) : ViewModel() {
@@ -40,6 +43,9 @@ class HomeViewModel @Inject constructor(
     // 3. Navigasyon (Pusula Kilitli Hedef)
     private val _navigationTarget = MutableStateFlow<TargetLocation?>(null)
     val navigationTarget: StateFlow<TargetLocation?> = _navigationTarget.asStateFlow()
+
+    val logs = logRepository.getAllLogs()
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
 
     // 4. Gizli Mod (Stealth Mode)
     // _isStealthMode silindi. Veri kaynağı doğrudan Repository (DataStore) oldu.
@@ -70,9 +76,19 @@ class HomeViewModel @Inject constructor(
         fetchTargets()
     }
 
-    // ============================================================================================
-    // VERİ İŞLEMLERİ (Data Operations)
-    // ============================================================================================
+    // Logları temizleme fonksiyonu
+    fun clearLogs() {
+        viewModelScope.launch {
+            logRepository.clearAll()
+        }
+    }
+
+    // (Opsiyonel) Test için manuel log ekleme fonksiyonu
+    fun addTestLog() {
+        viewModelScope.launch {
+            logRepository.logEvent("Test Hedef", LogEventType.ENTRY, "Simülasyon Girişi")
+        }
+    }
 
     private fun fetchTargets() {
         viewModelScope.launch {

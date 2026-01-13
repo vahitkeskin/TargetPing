@@ -12,6 +12,9 @@ import com.google.android.gms.location.FusedLocationProviderClient
 import com.google.android.gms.location.LocationServices
 import com.vahitkeskin.targetping.data.local.AppDatabase
 import com.vahitkeskin.targetping.data.local.TargetDao
+import com.vahitkeskin.targetping.data.local.dao.LogDao
+import com.vahitkeskin.targetping.data.repository.LogRepositoryImpl
+import com.vahitkeskin.targetping.domain.repository.LogRepository
 import dagger.Module
 import dagger.Provides
 import dagger.hilt.InstallIn
@@ -63,5 +66,13 @@ object AppModule {
         }
     }
 
-    // İleride buraya Room Database, Retrofit, DataStore vb. eklenecek.
+    @Provides
+    @Singleton
+    fun provideLogDao(db: AppDatabase): LogDao = db.logDao()
+
+    @Provides
+    @Singleton
+    fun provideLogRepository(dao: LogDao): LogRepository {
+        return LogRepositoryImpl(dao)
+    }
 }
