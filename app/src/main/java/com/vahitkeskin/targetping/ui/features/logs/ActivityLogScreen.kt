@@ -21,10 +21,7 @@ import com.vahitkeskin.targetping.ui.features.add_edit.GlassCard
 import com.vahitkeskin.targetping.ui.home.HomeViewModel
 import java.text.SimpleDateFormat
 import java.util.*
-
-private val CyberTeal = Color(0xFF00E5FF)
-private val AlertRed = Color(0xFFFF2A68)
-private val DarkBackground = Color(0xFF0A0A0A)
+import com.vahitkeskin.targetping.ui.theme.*
 
 @Composable
 fun ActivityLogScreen(viewModel: HomeViewModel) {
@@ -46,7 +43,7 @@ fun ActivityLogScreen(viewModel: HomeViewModel) {
             verticalAlignment = Alignment.CenterVertically
         ) {
             Row(verticalAlignment = Alignment.CenterVertically) {
-                Icon(Icons.Rounded.History, null, tint = CyberTeal)
+                Icon(Icons.Rounded.History, null, tint = PrimaryColor)
                 Spacer(Modifier.width(8.dp))
                 Text(
                     "SİSTEM GÜNLÜĞÜ",
@@ -64,7 +61,7 @@ fun ActivityLogScreen(viewModel: HomeViewModel) {
                     Icon(
                         imageVector = Icons.Rounded.BugReport, // Test/Debug ikonu
                         contentDescription = "Test Verisi Ekle",
-                        tint = CyberTeal.copy(alpha = 0.7f)
+                        tint = PrimaryColor.copy(alpha = 0.7f)
                     )
                 }
 
@@ -110,7 +107,7 @@ fun ActivityLogScreen(viewModel: HomeViewModel) {
 @Composable
 fun LogItemCard(log: LogEntity) {
     val isEntry = log.eventType == LogEventType.ENTRY
-    val iconColor = if (isEntry) CyberTeal else AlertRed
+    val iconColor = if (isEntry) PrimaryColor else AlertRed
     val icon = if (isEntry) Icons.Rounded.Login else Icons.Rounded.Logout
 
     // Tarih Formatlama
@@ -225,7 +222,7 @@ fun EmptyLogState(onTestClick: () -> Unit) {
                 colors = ButtonDefaults.buttonColors(containerColor = Color.White.copy(alpha = 0.1f)),
                 shape = MaterialTheme.shapes.medium
             ) {
-                Text("Test Kaydı Oluştur", color = CyberTeal)
+                Text("Test Kaydı Oluştur", color = PrimaryColor)
             }
         }
     }

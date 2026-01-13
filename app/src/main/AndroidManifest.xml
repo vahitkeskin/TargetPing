@@ -14,7 +14,7 @@
         android:name=".TargetPingApp"
         android:icon="@drawable/ic_target_ping_logo"
         android:label="RadiusAlert"
-        android:theme="@style/Theme.TargetPing">
+        android:theme="@style/Theme.App.Starting">
 
         <service
             android:name=".data.service.TrackingService"

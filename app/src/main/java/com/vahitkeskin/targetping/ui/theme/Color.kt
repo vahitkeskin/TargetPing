@@ -14,3 +14,7 @@ val PrimaryColor = Color(0xFF00E5FF) // Cyber Teal
 val BackgroundColor = Color(0xFF121212) // Dark
 val SurfaceColor = Color(0xFF1E1E1E)
 val ErrorColor = Color(0xFFCF6679)
+
+val AlertRed = Color(0xFFFF2A68)
+val DarkBackground = Color(0xFF050505)
+val GlassWhite = Color.White.copy(alpha = 0.1f)

@@ -51,10 +51,7 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import java.util.Locale
-
-private val CyberTeal = Color(0xFF00E5FF)
-private val AlertRed = Color(0xFFFF2A68)
-private val DarkSurface = Color(0xFF1E1E1E).copy(alpha = 0.95f)
+import com.vahitkeskin.targetping.ui.theme.*
 
 @SuppressLint("MissingPermission")
 @Composable
@@ -80,7 +77,10 @@ fun AddEditScreen(
     var bottomPanelHeight by remember { mutableStateOf(0.dp) }
 
     val hasLocationPermission = remember {
-        ContextCompat.checkSelfPermission(context, Manifest.permission.ACCESS_FINE_LOCATION) == PackageManager.PERMISSION_GRANTED
+        ContextCompat.checkSelfPermission(
+            context,
+            Manifest.permission.ACCESS_FINE_LOCATION
+        ) == PackageManager.PERMISSION_GRANTED
     }
 
     val initialPos = existingTarget?.let { LatLng(it.latitude, it.longitude) } ?: LatLng(0.0, 0.0)
@@ -97,17 +97,30 @@ fun AddEditScreen(
                 if (location != null) {
                     scope.launch {
                         cameraPositionState.animate(
-                            CameraUpdateFactory.newLatLngZoom(LatLng(location.latitude, location.longitude), 16f),
+                            CameraUpdateFactory.newLatLngZoom(
+                                LatLng(
+                                    location.latitude,
+                                    location.longitude
+                                ), 16f
+                            ),
                             1000
                         )
                     }
                 } else {
-                    client.getCurrentLocation(com.google.android.gms.location.Priority.PRIORITY_HIGH_ACCURACY, null)
+                    client.getCurrentLocation(
+                        com.google.android.gms.location.Priority.PRIORITY_HIGH_ACCURACY,
+                        null
+                    )
                         .addOnSuccessListener { currLoc ->
                             if (currLoc != null) {
                                 scope.launch {
                                     cameraPositionState.animate(
-                                        CameraUpdateFactory.newLatLngZoom(LatLng(currLoc.latitude, currLoc.longitude), 16f),
+                                        CameraUpdateFactory.newLatLngZoom(
+                                            LatLng(
+                                                currLoc.latitude,
+                                                currLoc.longitude
+                                            ), 16f
+                                        ),
                                         1000
                                     )
                                 }
@@ -128,10 +141,15 @@ fun AddEditScreen(
                     try {
                         val geocoder = Geocoder(context, Locale.getDefault())
                         if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.TIRAMISU) {
-                            geocoder.getFromLocation(target.latitude, target.longitude, 1) { addresses ->
+                            geocoder.getFromLocation(
+                                target.latitude,
+                                target.longitude,
+                                1
+                            ) { addresses ->
                                 val address = addresses.firstOrNull()
                                 val addrString = if (address != null) {
-                                    address.thoroughfare ?: address.subLocality ?: address.locality ?: "Bilinmeyen Konum"
+                                    address.thoroughfare ?: address.subLocality ?: address.locality
+                                    ?: "Bilinmeyen Konum"
                                 } else "Konum Bulunamadı"
                                 scope.launch {
                                     addressText = addrString
@@ -140,9 +158,12 @@ fun AddEditScreen(
                             }
                         } else {
                             @Suppress("DEPRECATION")
-                            val addresses = geocoder.getFromLocation(target.latitude, target.longitude, 1)
+                            val addresses =
+                                geocoder.getFromLocation(target.latitude, target.longitude, 1)
                             val address = addresses?.firstOrNull()
-                            val addrString = address?.thoroughfare ?: address?.subLocality ?: address?.locality ?: "Konum Bulunamadı"
+                            val addrString =
+                                address?.thoroughfare ?: address?.subLocality ?: address?.locality
+                                ?: "Konum Bulunamadı"
                             withContext(Dispatchers.Main) {
                                 addressText = addrString
                                 isAddressLoading = false
@@ -182,23 +203,32 @@ fun AddEditScreen(
                 modifier = Modifier.fillMaxSize(),
                 cameraPositionState = cameraPositionState,
                 contentPadding = PaddingValues(bottom = bottomPanelHeight),
-                properties = MapProperties(isMyLocationEnabled = hasLocationPermission, mapType = MapType.HYBRID),
-                uiSettings = MapUiSettings(zoomControlsEnabled = false, compassEnabled = false, myLocationButtonEnabled = false)
+                properties = MapProperties(
+                    isMyLocationEnabled = hasLocationPermission,
+                    mapType = MapType.HYBRID
+                ),
+                uiSettings = MapUiSettings(
+                    zoomControlsEnabled = false,
+                    compassEnabled = false,
+                    myLocationButtonEnabled = false
+                )
             ) {
                 Circle(
                     center = centerTarget,
                     radius = radiusInt.toDouble(),
-                    strokeColor = CyberTeal.copy(alpha = 0.9f),
+                    strokeColor = PrimaryColor.copy(alpha = 0.9f),
                     strokeWidth = 3f,
-                    fillColor = CyberTeal.copy(alpha = 0.15f)
+                    fillColor = PrimaryColor.copy(alpha = 0.15f)
                 )
             }
 
             // 2. ARAYÜZ KATMANLARI
             TacticalGridOverlay()
 
-            Box(modifier = Modifier.align(Alignment.Center).padding(bottom = bottomPanelHeight)) {
-                TacticalCrosshair(color = if (radiusInt > 0) CyberTeal else AlertRed)
+            Box(modifier = Modifier
+                .align(Alignment.Center)
+                .padding(bottom = bottomPanelHeight)) {
+                TacticalCrosshair(color = if (radiusInt > 0) PrimaryColor else AlertRed)
             }
 
             // 3. ÜST BAR
@@ -208,22 +238,41 @@ fun AddEditScreen(
                     .padding(16.dp)
                     .fillMaxWidth()
             ) {
-                Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween
+                ) {
                     IconButton(
                         onClick = onBack,
-                        modifier = Modifier.size(48.dp).background(DarkSurface.copy(0.8f), CircleShape).border(1.dp, Color.White.copy(0.2f), CircleShape)
+                        modifier = Modifier
+                            .size(48.dp)
+                            .background(SurfaceColor.copy(alpha = 0.95f), CircleShape)
+                            .border(1.dp, Color.White.copy(0.2f), CircleShape)
                     ) { Icon(Icons.Rounded.ArrowBack, null, tint = Color.White) }
 
                     IconButton(
                         onClick = {
                             if (hasLocationPermission) {
-                                val client = LocationServices.getFusedLocationProviderClient(context)
+                                val client =
+                                    LocationServices.getFusedLocationProviderClient(context)
                                 client.lastLocation.addOnSuccessListener { loc ->
-                                    if (loc != null) scope.launch { cameraPositionState.animate(CameraUpdateFactory.newLatLngZoom(LatLng(loc.latitude, loc.longitude), 16f)) }
+                                    if (loc != null) scope.launch {
+                                        cameraPositionState.animate(
+                                            CameraUpdateFactory.newLatLngZoom(
+                                                LatLng(
+                                                    loc.latitude,
+                                                    loc.longitude
+                                                ), 16f
+                                            )
+                                        )
+                                    }
                                 }
                             }
                         },
-                        modifier = Modifier.size(48.dp).background(CyberTeal, CircleShape).border(2.dp, Color.Black.copy(0.1f), CircleShape)
+                        modifier = Modifier
+                            .size(48.dp)
+                            .background(PrimaryColor, CircleShape)
+                            .border(2.dp, Color.Black.copy(0.1f), CircleShape)
                     ) { Icon(Icons.Rounded.GpsFixed, null, tint = Color.Black) }
                 }
                 Spacer(modifier = Modifier.height(16.dp))
@@ -265,9 +314,20 @@ fun AddEditScreen(
                             verticalArrangement = Arrangement.spacedBy(16.dp)
                         ) {
                             Row(verticalAlignment = Alignment.CenterVertically) {
-                                Icon(Icons.Rounded.Radar, null, tint = CyberTeal, modifier = Modifier.size(16.dp))
+                                Icon(
+                                    Icons.Rounded.Radar,
+                                    null,
+                                    tint = PrimaryColor,
+                                    modifier = Modifier.size(16.dp)
+                                )
                                 Spacer(modifier = Modifier.width(8.dp))
-                                Text("HEDEF PARAMETRELERİ", style = MaterialTheme.typography.labelSmall, color = CyberTeal, fontWeight = FontWeight.Bold, letterSpacing = 2.sp)
+                                Text(
+                                    "HEDEF PARAMETRELERİ",
+                                    style = MaterialTheme.typography.labelSmall,
+                                    color = PrimaryColor,
+                                    fontWeight = FontWeight.Bold,
+                                    letterSpacing = 2.sp
+                                )
                             }
 
                             CyberInput(
@@ -289,8 +349,15 @@ fun AddEditScreen(
                                 text = if (isEditing) "HEDEFİ GÜNCELLE" else "KONUMU ONAYLA",
                                 onClick = {
                                     if (name.isNotBlank()) {
-                                        if (existingTarget != null) viewModel.deleteTarget(existingTarget.id)
-                                        viewModel.addTarget(name, centerTarget.latitude, centerTarget.longitude, radiusInt)
+                                        if (existingTarget != null) viewModel.deleteTarget(
+                                            existingTarget.id
+                                        )
+                                        viewModel.addTarget(
+                                            name,
+                                            centerTarget.latitude,
+                                            centerTarget.longitude,
+                                            radiusInt
+                                        )
                                         onBack()
                                     }
                                 }
@@ -330,7 +397,7 @@ fun AddressHudPill(address: String, isLoading: Boolean) {
                 Icon(
                     imageVector = Icons.Rounded.LocationOn,
                     contentDescription = null,
-                    tint = if (isLoading) AlertRed.copy(alpha) else CyberTeal,
+                    tint = if (isLoading) AlertRed.copy(alpha) else PrimaryColor,
                     modifier = Modifier.size(16.dp)
                 )
 
@@ -441,7 +508,7 @@ fun CyberInput(
                 {
                     Text(
                         it,
-                        color = CyberTeal,
+                        color = PrimaryColor,
                         fontWeight = FontWeight.Bold,
                         modifier = Modifier.padding(end = 16.dp)
                     )
@@ -450,11 +517,11 @@ fun CyberInput(
             colors = OutlinedTextFieldDefaults.colors(
                 focusedContainerColor = Color.Black.copy(0.4f),
                 unfocusedContainerColor = Color.Black.copy(0.2f),
-                focusedBorderColor = CyberTeal,
+                focusedBorderColor = PrimaryColor,
                 unfocusedBorderColor = Color.White.copy(0.1f),
                 focusedTextColor = Color.White,
                 unfocusedTextColor = Color.White,
-                cursorColor = CyberTeal
+                cursorColor = PrimaryColor
             ),
             shape = RoundedCornerShape(8.dp)
         )
@@ -469,7 +536,7 @@ fun ActionPrimaryButton(text: String, onClick: () -> Unit) {
             .fillMaxWidth()
             .height(56.dp),
         colors = ButtonDefaults.buttonColors(
-            containerColor = CyberTeal,
+            containerColor = PrimaryColor,
             contentColor = Color.Black
         ),
         shape = RoundedCornerShape(12.dp),

@@ -3,7 +3,20 @@ package com.vahitkeskin.targetping.ui.home
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
-import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.WindowInsets
+import androidx.compose.foundation.layout.fillMaxHeight
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.navigationBars
+import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.windowInsetsPadding
 import androidx.compose.foundation.pager.HorizontalPager
 import androidx.compose.foundation.pager.rememberPagerState
 import androidx.compose.foundation.shape.CircleShape
@@ -13,7 +26,10 @@ import androidx.compose.material.icons.rounded.History
 import androidx.compose.material.icons.rounded.List
 import androidx.compose.material.icons.rounded.Map
 import androidx.compose.material.icons.rounded.Settings
-import androidx.compose.material3.*
+import androidx.compose.material3.Icon
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.Scaffold
+import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.ui.Alignment
@@ -21,9 +37,8 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
-import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.unit.sp // Font boyutu ayarı için eklendi
+import androidx.compose.ui.unit.sp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
@@ -33,13 +48,13 @@ import com.vahitkeskin.targetping.ui.features.add_edit.AddEditScreen
 import com.vahitkeskin.targetping.ui.features.logs.ActivityLogScreen
 import com.vahitkeskin.targetping.ui.features.map.MapScreen
 import com.vahitkeskin.targetping.ui.features.settings.SettingsScreen
+import com.vahitkeskin.targetping.ui.features.splash.SplashScreen
 import com.vahitkeskin.targetping.ui.features.targets.TargetsListScreen
 import com.vahitkeskin.targetping.ui.navigation.Screen
-import com.vahitkeskin.targetping.utils.uninstallSelf
 import kotlinx.coroutines.launch
-
-private val CyberTeal = Color(0xFF00E5FF)
-private val GlassBackground = Color(0xFF1E1E1E).copy(alpha = 0.95f)
+import com.vahitkeskin.targetping.ui.theme.*
+import androidx.compose.foundation.interaction.MutableInteractionSource
+import androidx.compose.runtime.remember
 
 @Composable
 fun MainScreen(
@@ -47,17 +62,34 @@ fun MainScreen(
 ) {
     val navController = rememberNavController()
 
-    // Hesap Makinesi yok, direkt uygulama açılıyor.
     Scaffold(
         containerColor = Color.Black,
         contentWindowInsets = WindowInsets(0.dp), // Tam ekran (Edge-to-Edge)
         bottomBar = { /* BottomBar, DashboardScreen içinde yönetiliyor */ }
     ) { paddingValues ->
+        // paddingValues kullanılmıyor çünkü tam ekran istiyoruz,
+        // ancak Box içinde padding vermek gerekirse burası kullanılabilir.
+
         NavHost(
             navController = navController,
-            startDestination = Screen.Dashboard,
+            startDestination = Screen.Splash, // DEĞİŞİKLİK: Başlangıç Splash oldu
             modifier = Modifier.fillMaxSize()
         ) {
+
+            // 1. SPLASH EKRANI (YENİ)
+            composable<Screen.Splash> {
+                SplashScreen(
+                    onAnimationFinished = {
+                        // Animasyon bittiğinde Dashboard'a git
+                        navController.navigate(Screen.Dashboard) {
+                            // Geri tuşuna basınca Splash'e dönmemesi için stack'ten siliyoruz
+                            popUpTo(Screen.Splash) { inclusive = true }
+                        }
+                    }
+                )
+            }
+
+            // 2. DASHBOARD (ANA EKRAN)
             composable<Screen.Dashboard> {
                 DashboardScreen(
                     viewModel = viewModel,
@@ -67,6 +99,7 @@ fun MainScreen(
                 )
             }
 
+            // 3. EKLEME / DÜZENLEME EKRANI
             composable<Screen.AddEdit> { backStackEntry ->
                 val args = backStackEntry.toRoute<Screen.AddEdit>()
                 AddEditScreen(
@@ -88,6 +121,7 @@ fun DashboardScreen(
     // 4 Sayfalı Yapı
     val pagerState = rememberPagerState(pageCount = { 4 })
     val scope = rememberCoroutineScope()
+    // Harita sayfasında (0) swipe'ı engelle, diğerlerinde serbest bırak
     val isScrollEnabled = pagerState.currentPage != 0
 
     Box(modifier = Modifier.fillMaxSize()) {
@@ -109,6 +143,7 @@ fun DashboardScreen(
                     Box(modifier = Modifier.fillMaxSize()) {
                         TargetsListScreen(
                             viewModel = viewModel,
+                            // Işınlanma (Animasyonsuz geçiş)
                             onNavigateToMap = { scope.launch { pagerState.scrollToPage(0) } },
                             onEditTarget = { target -> onNavigateToAdd(target.id) }
                         )
@@ -125,8 +160,7 @@ fun DashboardScreen(
             currentPage = pagerState.currentPage,
             onTabSelected = { index ->
                 scope.launch {
-                    // ESKİSİ: pagerState.animateScrollToPage(index)
-                    // YENİSİ: Doğrudan geçiş (Animasyonsuz/Işınlanma)
+                    // Doğrudan geçiş (Animasyonsuz/Işınlanma)
                     pagerState.scrollToPage(index)
                 }
             }
@@ -147,7 +181,7 @@ fun GlassBottomNavigation(
             .padding(start = 16.dp, end = 16.dp, bottom = 24.dp)
             .height(80.dp)
             .clip(RoundedCornerShape(40.dp))
-            .background(GlassBackground)
+            .background(SurfaceColor.copy(alpha = 0.95f))
     ) {
         Row(
             modifier = Modifier.fillMaxSize(),
@@ -164,8 +198,11 @@ fun GlassBottomNavigation(
 
 @Composable
 fun CyberNavItem(icon: ImageVector, label: String, isSelected: Boolean, onClick: () -> Unit) {
-    // Seçiliyse CyberTeal, değilse Gri
-    val color = if (isSelected) CyberTeal else Color.Gray
+    // Seçiliyse PrimaryColor, değilse Gri
+    val color = if (isSelected) PrimaryColor else Color.Gray
+
+    // Tıklama efektini kaldırmak için gerekli etkileşim kaynağı
+    val interactionSource = remember { MutableInteractionSource() }
 
     Column(
         horizontalAlignment = Alignment.CenterHorizontally,
@@ -173,8 +210,12 @@ fun CyberNavItem(icon: ImageVector, label: String, isSelected: Boolean, onClick:
         modifier = Modifier
             .fillMaxHeight()
             .clip(CircleShape)
-            .clickable { onClick() }
-            .padding(horizontal = 8.dp) // Alanı biraz daralttık ki sığsın
+            .clickable(
+                interactionSource = interactionSource,
+                indication = null, // Burayı null yaparak efekti/gölgeyi kapatıyoruz
+                onClick = onClick
+            )
+            .padding(horizontal = 8.dp)
     ) {
         Icon(icon, label, tint = color, modifier = Modifier.size(26.dp))
         Spacer(Modifier.height(4.dp))

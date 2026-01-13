@@ -122,4 +122,7 @@ dependencies {
 
     // Biometric Authentication
     implementation(libs.androidx.biometric)
+
+    // Splash
+    implementation(libs.androidx.core.splashscreen)
 }

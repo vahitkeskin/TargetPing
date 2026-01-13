@@ -31,10 +31,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.vahitkeskin.targetping.domain.model.TargetLocation
-
-private val CyberTeal = Color(0xFF00E5FF)
-private val AlertRed = Color(0xFFFF2A68)
-private val DarkSurface = Color(0xFF1E1E1E).copy(alpha = 0.9f)
+import com.vahitkeskin.targetping.ui.theme.*
 
 @Composable
 fun CompassOverlay(
@@ -115,8 +112,8 @@ fun CompassOverlay(
             modifier = Modifier
                 .width(280.dp)
                 .clip(RoundedCornerShape(32.dp))
-                .background(DarkSurface)
-                .border(1.dp, CyberTeal.copy(0.3f), RoundedCornerShape(32.dp))
+                .background(SurfaceColor)
+                .border(1.dp, PrimaryColor.copy(0.3f), RoundedCornerShape(32.dp))
                 .padding(24.dp)
         ) {
             Row(
@@ -124,7 +121,7 @@ fun CompassOverlay(
                 horizontalArrangement = Arrangement.SpaceBetween,
                 verticalAlignment = Alignment.CenterVertically
             ) {
-                Text("TACTICAL NAV", color = CyberTeal, fontWeight = FontWeight.Bold, fontSize = 12.sp)
+                Text("TACTICAL NAV", color = PrimaryColor, fontWeight = FontWeight.Bold, fontSize = 12.sp)
                 IconButton(onClick = onStopNavigation, modifier = Modifier.size(24.dp).background(AlertRed.copy(0.2f), CircleShape)) {
                     Icon(Icons.Rounded.Close, null, tint = AlertRed, modifier = Modifier.padding(4.dp))
                 }
@@ -134,12 +131,12 @@ fun CompassOverlay(
 
             Box(contentAlignment = Alignment.Center, modifier = Modifier.size(160.dp)) {
                 Canvas(modifier = Modifier.fillMaxSize()) {
-                    drawCircle(color = CyberTeal.copy(0.1f), style = Stroke(width = 2.dp.toPx()))
+                    drawCircle(color = PrimaryColor.copy(0.1f), style = Stroke(width = 2.dp.toPx()))
                     for (i in 0..3) {
                         // Canvas içinde DrawScope rotate kullanıyoruz
                         rotate(i * 90f) {
                             drawLine(
-                                color = CyberTeal.copy(0.5f),
+                                color = PrimaryColor.copy(0.5f),
                                 start = Offset(size.width / 2, 0f),
                                 end = Offset(size.width / 2, 10.dp.toPx()),
                                 strokeWidth = 2.dp.toPx()
@@ -151,7 +148,7 @@ fun CompassOverlay(
                 Icon(
                     imageVector = Icons.Rounded.Navigation,
                     contentDescription = null,
-                    tint = CyberTeal,
+                    tint = PrimaryColor,
                     modifier = Modifier
                         .size(80.dp)
                         // HATA BURADAYDI: graphicsLayer kullanarak çözdük
@@ -165,7 +162,7 @@ fun CompassOverlay(
             Text("DISTANCE TO TARGET", color = Color.Gray, fontSize = 10.sp, fontWeight = FontWeight.Bold)
             Text("${distance.toInt()} M", color = Color.White, fontSize = 32.sp, fontWeight = FontWeight.Black)
             Spacer(modifier = Modifier.height(8.dp))
-            Text(target.name.uppercase(), color = CyberTeal, fontWeight = FontWeight.Bold)
+            Text(target.name.uppercase(), color = PrimaryColor, fontWeight = FontWeight.Bold)
         }
     }
 }

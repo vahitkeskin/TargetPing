@@ -17,19 +17,13 @@ import androidx.compose.ui.draw.rotate
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.drawscope.Stroke
+import com.vahitkeskin.targetping.ui.theme.*
 
-// --- RENK PALETİ ---
-val CyberTeal = Color(0xFF00E5FF)
-val AlertRed = Color(0xFFFF2A68)
-val DarkSurface = Color(0xFF1E1E1E).copy(alpha = 0.9f)
-val GlassWhite = Color.White.copy(alpha = 0.1f)
-
-// --- RADAR ANİMASYONU ---
 @Composable
 fun RadarPulseAnimation(
     modifier: Modifier = Modifier,
     isPlaying: Boolean,
-    color: Color = CyberTeal
+    color: Color = PrimaryColor
 ) {
     if (!isPlaying) return
 
