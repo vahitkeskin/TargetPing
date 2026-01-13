@@ -131,9 +131,10 @@ com.vahitkeskin.targetping
     ├── features
     │   ├── map          # Main Dashboard Logic
     │   ├── list         # Target Management
-    │   └── add_edit     # Target Creation Logic
+    │   ├── add_edit     # Target Creation Logic
+    │   ├── logs         # Activity History
+    │   └── settings     # System Permissions & Preferences
     └── theme            # Custom Design System
-
 ```
 
 ---

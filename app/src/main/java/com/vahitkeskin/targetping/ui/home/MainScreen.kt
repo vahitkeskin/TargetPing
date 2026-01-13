@@ -46,7 +46,6 @@ fun MainScreen(
     viewModel: HomeViewModel = hiltViewModel()
 ) {
     val navController = rememberNavController()
-    val context = LocalContext.current
 
     // Hesap Makinesi yok, direkt uygulama açılıyor.
     Scaffold(
@@ -110,8 +109,6 @@ fun DashboardScreen(
                     Box(modifier = Modifier.fillMaxSize()) {
                         TargetsListScreen(
                             viewModel = viewModel,
-                            // ESKİSİ: pagerState.animateScrollToPage(0)
-                            // YENİSİ:
                             onNavigateToMap = { scope.launch { pagerState.scrollToPage(0) } },
                             onEditTarget = { target -> onNavigateToAdd(target.id) }
                         )
@@ -169,7 +166,6 @@ fun GlassBottomNavigation(
 fun CyberNavItem(icon: ImageVector, label: String, isSelected: Boolean, onClick: () -> Unit) {
     // Seçiliyse CyberTeal, değilse Gri
     val color = if (isSelected) CyberTeal else Color.Gray
-    // Seçili değilse fontu biraz daha küçültüp inceltebiliriz (Opsiyonel, şu an sabit bıraktım)
 
     Column(
         horizontalAlignment = Alignment.CenterHorizontally,
@@ -181,11 +177,7 @@ fun CyberNavItem(icon: ImageVector, label: String, isSelected: Boolean, onClick:
             .padding(horizontal = 8.dp) // Alanı biraz daralttık ki sığsın
     ) {
         Icon(icon, label, tint = color, modifier = Modifier.size(26.dp))
-
         Spacer(Modifier.height(4.dp))
-
-        // DEĞİŞİKLİK BURADA: if(isSelected) kaldırıldı.
-        // Artık metin her zaman görünüyor, rengi yukarıdaki 'color' değişkenine göre değişiyor.
         Text(
             text = label,
             style = MaterialTheme.typography.labelSmall.copy(fontSize = 10.sp),

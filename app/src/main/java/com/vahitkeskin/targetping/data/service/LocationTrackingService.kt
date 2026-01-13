@@ -16,7 +16,9 @@ import androidx.core.app.NotificationCompat
 import com.google.android.gms.location.*
 import com.vahitkeskin.targetping.MainActivity
 import com.vahitkeskin.targetping.R
+import com.vahitkeskin.targetping.data.local.entity.LogEventType
 import com.vahitkeskin.targetping.domain.model.TargetLocation
+import com.vahitkeskin.targetping.domain.repository.LogRepository
 import com.vahitkeskin.targetping.domain.repository.TargetRepository
 import dagger.hilt.android.AndroidEntryPoint
 import kotlinx.coroutines.*
@@ -30,13 +32,20 @@ class LocationTrackingService : Service() {
     @Inject
     lateinit var repository: TargetRepository
 
+    @Inject
+    lateinit var logRepository: LogRepository
+
     private lateinit var fusedLocationClient: FusedLocationProviderClient
     private lateinit var locationCallback: LocationCallback
 
     private val serviceScope = CoroutineScope(Dispatchers.IO + Job())
 
-    // Anlık olarak takip edilecek hedeflerin listesi (Veritabanından otomatik güncellenir)
+    // Veritabanından gelen aktif hedefler
     private var activeTargets: List<TargetLocation> = emptyList()
+
+    // RAM'de tutulan, şu an içinde bulunduğumuz hedeflerin ID listesi.
+    // Bu sayede hedef içindeyken sürekli log atılmasını engelleriz.
+    private val insideTargets = mutableSetOf<String>()
 
     companion object {
         const val ACTION_START = "ACTION_START"
@@ -49,19 +58,18 @@ class LocationTrackingService : Service() {
         super.onCreate()
         fusedLocationClient = LocationServices.getFusedLocationProviderClient(this)
 
-        // 1. ADIM: Veritabanındaki aktif hedefleri sürekli dinle ve listeyi güncel tut
+        // 1. Veritabanındaki aktif hedefleri dinle
         repository.getTargets()
             .onEach { targets ->
                 activeTargets = targets.filter { it.isActive }
             }
             .launchIn(serviceScope)
 
-        // Konum Geri Çağırımı (Her konum değiştiğinde burası çalışır)
+        // 2. Konum Callback
         locationCallback = object : LocationCallback() {
             override fun onLocationResult(result: LocationResult) {
                 result.lastLocation?.let { location ->
-                    // 2. ADIM: Konum her değiştiğinde bildirimdeki metni güncelle
-                    checkDistanceAndUpdateNotification(location)
+                    checkDistanceAndLog(location)
                 }
             }
         }
@@ -77,11 +85,10 @@ class LocationTrackingService : Service() {
 
     @SuppressLint("MissingPermission")
     private fun startTracking() {
-        // İlk bildirimi oluştur ve servisi başlat
         startForeground(NOTIFICATION_ID, createNotification("Sistem Başlatılıyor...", "Uydu bağlantısı kuruluyor."))
 
-        val request = LocationRequest.Builder(Priority.PRIORITY_HIGH_ACCURACY, 1000L) // 1 saniyede bir güncelle
-            .setMinUpdateDistanceMeters(2f) // Veya 2 metre hareket edince
+        val request = LocationRequest.Builder(Priority.PRIORITY_HIGH_ACCURACY, 1000L)
+            .setMinUpdateDistanceMeters(2f)
             .build()
 
         fusedLocationClient.requestLocationUpdates(request, locationCallback, Looper.getMainLooper())
@@ -94,25 +101,18 @@ class LocationTrackingService : Service() {
         serviceScope.cancel()
     }
 
-    // 1. BU FONKSİYON HAREKETİ ALGILAR VE İKONU SEÇER
-    private fun checkDistanceAndUpdateNotification(currentLoc: Location) {
+    // --- LOGIC: Hem Bildirimi Güncelle Hem Giriş/Çıkış Logla ---
+    private fun checkDistanceAndLog(currentLoc: Location) {
         if (activeTargets.isEmpty()) {
             updateNotification("😴 Tarama Modu", "Aktif hedef bulunamadı.")
             return
         }
 
-        // --- HAREKET MANTIĞI ---
-        // Hız 0.5 m/s'den (yaklaşık 1.8 km/s) büyükse YÜRÜYOR sayalım.
-        // hasSpeed() kontrolü bazı eski cihazlar için güvenliktir.
+        // Hareket durumu
         val isMoving = currentLoc.hasSpeed() && currentLoc.speed > 0.5f
-
-        // Duruma göre Emoji İkonu Seçimi
         val statusIcon = if (isMoving) "🏃" else "🧍"
-
-        // Başlığa ikonu ekle
         val dynamicTitle = "$statusIcon HEDEF TAKİBİ AKTİF"
 
-        // --- MESAFE HESABI (Standart) ---
         var nearestDistance = Float.MAX_VALUE
         var nearestTargetName = ""
 
@@ -123,25 +123,60 @@ class LocationTrackingService : Service() {
                 target.latitude, target.longitude,
                 results
             )
+            val distanceInMeters = results[0]
 
-            if (results[0] < nearestDistance) {
-                nearestDistance = results[0]
+            // 1. En yakını bul (Bildirim metni için)
+            if (distanceInMeters < nearestDistance) {
+                nearestDistance = distanceInMeters
                 nearestTargetName = target.name
+            }
+
+            // 2. LOGLAMA MANTIĞI (Giriş / Çıkış)
+            val isInsideNow = distanceInMeters <= target.radiusMeters
+
+            if (isInsideNow) {
+                // Eğer menzil içindeyiz AMA set içinde yoksa -> YENİ GİRİŞ
+                if (!insideTargets.contains(target.id)) {
+                    insideTargets.add(target.id)
+
+                    // Veritabanına Log At (ENTRY)
+                    serviceScope.launch {
+                        logRepository.logEvent(
+                            targetName = target.name,
+                            type = LogEventType.ENTRY,
+                            message = "Hedefe giriş yapıldı (${distanceInMeters.toInt()}m)"
+                        )
+                    }
+
+                    // İstersen burada bildirim sesini/titreşimi tetikleyebilirsin
+                }
+            } else {
+                // Eğer menzil dışındayız AMA set içinde varsa -> YENİ ÇIKIŞ
+                if (insideTargets.contains(target.id)) {
+                    insideTargets.remove(target.id)
+
+                    // Veritabanına Log At (EXIT)
+                    serviceScope.launch {
+                        logRepository.logEvent(
+                            targetName = target.name,
+                            type = LogEventType.EXIT,
+                            message = "Bölgeden çıkıldı"
+                        )
+                    }
+                }
             }
         }
 
+        // 3. Bildirimi Güncelle
         val distanceStr = if (nearestDistance > 1000) {
             String.format("%.1f KM", nearestDistance / 1000)
         } else {
             "${nearestDistance.toInt()} M"
         }
 
-        // 2. GÜNCELLEMEYİ TETİKLE
         updateNotification(dynamicTitle, "$nearestTargetName: $distanceStr kaldı")
     }
 
-    // --- SENİN MEVCUT KODUN (HİÇ BOZULMADI) ---
-    // Sadece title parametresi artık emojili geliyor.
     private fun createNotification(title: String, content: String): Notification {
         val manager = getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
 
@@ -164,7 +199,7 @@ class LocationTrackingService : Service() {
         )
 
         return NotificationCompat.Builder(this, CHANNEL_ID)
-            .setContentTitle(title) // Buraya artık "🏃 HEDEF TAKİBİ" geliyor
+            .setContentTitle(title)
             .setContentText(content)
             .setSmallIcon(R.drawable.ic_target_ping_logo)
             .setContentIntent(pendingIntent)
@@ -174,7 +209,6 @@ class LocationTrackingService : Service() {
             .build()
     }
 
-    // Yardımcı fonksiyon (Aynı ID ile güncelleme yapar)
     private fun updateNotification(title: String, text: String) {
         val notification = createNotification(title, text)
         val manager = getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
