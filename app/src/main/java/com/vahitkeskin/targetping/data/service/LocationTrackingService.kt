@@ -178,7 +178,7 @@ class LocationTrackingService : Service() {
     }
 
     private fun createNotification(title: String, content: String): Notification {
-        val manager = getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
+        val manager = getSystemService(NOTIFICATION_SERVICE) as NotificationManager
 
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
             val channel = NotificationChannel(
@@ -211,7 +211,7 @@ class LocationTrackingService : Service() {
 
     private fun updateNotification(title: String, text: String) {
         val notification = createNotification(title, text)
-        val manager = getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
+        val manager = getSystemService(NOTIFICATION_SERVICE) as NotificationManager
         manager.notify(NOTIFICATION_ID, notification)
     }
 
