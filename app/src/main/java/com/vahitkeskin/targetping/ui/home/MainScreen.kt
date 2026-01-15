@@ -3,6 +3,7 @@ package com.vahitkeskin.targetping.ui.home
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -31,6 +32,7 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -51,10 +53,9 @@ import com.vahitkeskin.targetping.ui.features.settings.SettingsScreen
 import com.vahitkeskin.targetping.ui.features.splash.SplashScreen
 import com.vahitkeskin.targetping.ui.features.targets.TargetsListScreen
 import com.vahitkeskin.targetping.ui.navigation.Screen
+import com.vahitkeskin.targetping.ui.theme.PrimaryColor
+import com.vahitkeskin.targetping.ui.theme.SurfaceColor
 import kotlinx.coroutines.launch
-import com.vahitkeskin.targetping.ui.theme.*
-import androidx.compose.foundation.interaction.MutableInteractionSource
-import androidx.compose.runtime.remember
 
 @Composable
 fun MainScreen(

@@ -5,8 +5,10 @@ import android.content.Intent
 import android.os.Build
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.vahitkeskin.targetping.data.local.ThemePreferenceManager
 import com.vahitkeskin.targetping.data.local.entity.LogEventType
 import com.vahitkeskin.targetping.data.service.LocationTrackingService
+import com.vahitkeskin.targetping.domain.model.MapStyleConfig
 import com.vahitkeskin.targetping.domain.model.TargetLocation
 import com.vahitkeskin.targetping.domain.repository.AppSettingsRepository
 import com.vahitkeskin.targetping.domain.repository.LogRepository
@@ -71,9 +73,25 @@ class HomeViewModel @Inject constructor(
     var isBiometricEnabled = MutableStateFlow(true)
     var isDarkThemeForced = MutableStateFlow(true)
     var notificationSound = MutableStateFlow(true)
+    private val themeManager = ThemePreferenceManager(application)
 
     init {
+        viewModelScope.launch {
+            themeManager.mapStyleFlow.collect { savedStyle ->
+                _currentMapStyle.value = savedStyle
+            }
+        }
         fetchTargets()
+    }
+
+    private val _currentMapStyle = MutableStateFlow(MapStyleConfig.STANDARD)
+    val currentMapStyle: StateFlow<MapStyleConfig> = _currentMapStyle.asStateFlow()
+
+    fun updateMapStyle(newStyle: MapStyleConfig) {
+        viewModelScope.launch {
+            _currentMapStyle.value = newStyle
+            themeManager.saveMapStyle(newStyle) // DataStore'a yaz
+        }
     }
 
     // Logları temizleme fonksiyonu
