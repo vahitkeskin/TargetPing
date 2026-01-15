@@ -6,13 +6,39 @@ import android.net.Uri
 import android.os.Build
 import android.provider.Settings
 import androidx.compose.foundation.background
-import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.PaddingValues
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.WindowInsets
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.statusBars
+import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.windowInsetsTopHeight
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.rounded.*
-import androidx.compose.material3.*
-import androidx.compose.runtime.*
+import androidx.compose.material.icons.rounded.MyLocation
+import androidx.compose.material.icons.rounded.NotificationsActive
+import androidx.compose.material.icons.rounded.Settings
+import androidx.compose.material.icons.rounded.VolumeUp
+import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.Icon
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.Switch
+import androidx.compose.material3.SwitchDefaults
+import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
+import androidx.compose.runtime.Composable
+import androidx.compose.runtime.collectAsState
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
 import androidx.compose.runtime.saveable.rememberSaveable
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
@@ -21,17 +47,23 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import com.google.accompanist.permissions.*
+import com.google.accompanist.permissions.ExperimentalPermissionsApi
+import com.google.accompanist.permissions.isGranted
+import com.google.accompanist.permissions.rememberMultiplePermissionsState
+import com.google.accompanist.permissions.rememberPermissionState
+import com.google.accompanist.permissions.shouldShowRationale
 import com.vahitkeskin.targetping.ui.features.add_edit.GlassCard
+import com.vahitkeskin.targetping.ui.features.settings.components.MapThemeSelector
 import com.vahitkeskin.targetping.ui.home.HomeViewModel
-import com.vahitkeskin.targetping.utils.openAppSettings
-import com.vahitkeskin.targetping.ui.theme.*
+import com.vahitkeskin.targetping.ui.theme.DarkBackground
+import com.vahitkeskin.targetping.ui.theme.PrimaryColor
 
 @OptIn(ExperimentalPermissionsApi::class)
 @Composable
 fun SettingsScreen(viewModel: HomeViewModel) {
     val context = LocalContext.current
     val isSound by viewModel.notificationSound.collectAsState()
+    val currentMapStyle by viewModel.currentMapStyle.collectAsState()
 
     // --- İZİN STATE'LERİ ---
     val locationPermissionsState = rememberMultiplePermissionsState(
@@ -45,18 +77,15 @@ fun SettingsScreen(viewModel: HomeViewModel) {
         rememberPermissionState(Manifest.permission.POST_NOTIFICATIONS)
     } else null
 
-    // Diyalog kontrolü
     var showSettingsRedirectDialog by remember { mutableStateOf<String?>(null) }
-
-    // Kullanıcının bu ekranda butona basıp basmadığını takip etmek için.
-    // Bu, "Kalıcı Red" durumunu anlamamıza yardımcı olur.
     var hasRequestedLocationInThisSession by rememberSaveable { mutableStateOf(false) }
     var hasRequestedNotificationInThisSession by rememberSaveable { mutableStateOf(false) }
 
-    // --- YARDIMCI FONKSİYONLAR ---
-    fun openAppSettings() {
-        val intent = Intent(Settings.ACTION_APPLICATION_DETAILS_SETTINGS).apply {
-            data = Uri.fromParts("package", context.packageName, null)
+    fun openAppSettings(action: String = Settings.ACTION_APPLICATION_DETAILS_SETTINGS) {
+        val intent = Intent(action).apply {
+            if (action == Settings.ACTION_APPLICATION_DETAILS_SETTINGS) {
+                data = Uri.fromParts("package", context.packageName, null)
+            }
         }
         context.startActivity(intent)
     }
@@ -88,6 +117,21 @@ fun SettingsScreen(viewModel: HomeViewModel) {
             contentPadding = PaddingValues(bottom = 100.dp),
             verticalArrangement = Arrangement.spacedBy(16.dp)
         ) {
+
+            // HARİTA TEMA SEÇİCİ ---
+            item { SectionHeader("HARİTA GÖRÜNÜMÜ") }
+            item {
+                GlassCard(modifier = Modifier.fillMaxWidth()) {
+                    Column(Modifier.padding(vertical = 16.dp)) {
+                        MapThemeSelector(
+                            currentStyle = currentMapStyle,
+                            onStyleSelected = { viewModel.updateMapStyle(it) }
+                        )
+                    }
+                }
+            }
+
+            // MEVCUT BÖLÜMLER
             item { SectionHeader("SİSTEM İZİNLERİ") }
 
             // 1. KONUM İZNİ
@@ -100,18 +144,12 @@ fun SettingsScreen(viewModel: HomeViewModel) {
                     isChecked = isLocationGranted,
                     onCheckedChange = {
                         if (isLocationGranted) {
-                            // İzin zaten var, kullanıcı kapatmak istiyor -> Ayarlara yönlendir
                             showSettingsRedirectDialog = "Konum iznini kapatmak uygulamanın çalışmasını durduracaktır. Ayarlardan kapatmak istiyor musunuz?"
                         } else {
-                            // İzin YOK. Talep edilecek.
                             val shouldShowRationale = locationPermissionsState.shouldShowRationale
-
-                            // Mantık: Eğer Rationale göstermemiz gerekmiyorsa (ya ilk kez, ya da kalıcı red)
-                            // VE daha önce bu oturumda istediysek -> Demek ki kalıcı red yemişiz.
                             if (!shouldShowRationale && hasRequestedLocationInThisSession) {
-                                showSettingsRedirectDialog = "Konum izni kalıcı olarak reddedilmiş görünüyor. Kullanabilmek için ayarlardan manuel izin vermelisiniz."
+                                showSettingsRedirectDialog = "Konum izni kalıcı olarak reddedilmiş. Ayarlardan manuel izin vermelisiniz."
                             } else {
-                                // Diğer tüm durumlarda (İlk kez veya Rationale true ise) direkt sistem popup'ını aç.
                                 locationPermissionsState.launchMultiplePermissionRequest()
                                 hasRequestedLocationInThisSession = true
                             }
@@ -123,7 +161,6 @@ fun SettingsScreen(viewModel: HomeViewModel) {
             // 2. BİLDİRİM İZNİ
             item {
                 val isNotificationGranted = notificationPermissionState?.status?.isGranted ?: true
-
                 SettingsItem(
                     icon = Icons.Rounded.NotificationsActive,
                     title = "Bildirim İzni",
@@ -132,17 +169,12 @@ fun SettingsScreen(viewModel: HomeViewModel) {
                     onCheckedChange = {
                         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU && notificationPermissionState != null) {
                             if (isNotificationGranted) {
-                                // Kapatmak istiyor -> Ayarlara yönlendir
                                 showSettingsRedirectDialog = "Bildirimleri kapatmak için ayarlara gitmeniz gerekmektedir."
                             } else {
-                                // Açmak istiyor
                                 val shouldShowRationale = notificationPermissionState.status.shouldShowRationale
-
                                 if (!shouldShowRationale && hasRequestedNotificationInThisSession) {
-                                    // Kalıcı red durumu tespiti
                                     showSettingsRedirectDialog = "Bildirim izni vermeniz gerekmektedir. Ayarlara giderek izni açabilirsiniz."
                                 } else {
-                                    // İlk kez veya tekrar sorulabilir durum -> Sistem Popup'ı
                                     notificationPermissionState.launchPermissionRequest()
                                     hasRequestedNotificationInThisSession = true
                                 }
@@ -152,7 +184,6 @@ fun SettingsScreen(viewModel: HomeViewModel) {
                 )
             }
 
-            // --- DİĞER AYARLAR ---
             item { SectionHeader("UYGULAMA TERCİHLERİ") }
             item {
                 SettingsItem(
@@ -183,14 +214,12 @@ fun SettingsScreen(viewModel: HomeViewModel) {
                 text = { Text(showSettingsRedirectDialog!!) },
                 confirmButton = {
                     TextButton(onClick = {
-                        // Hangi ayar için diyalog açıldıysa ona göre yönlendirme yapıyoruz
                         val action = if (showSettingsRedirectDialog?.contains("Bildirim") == true) {
-                            Settings.ACTION_APP_NOTIFICATION_SETTINGS // Direkt Bildirim Ekranı
+                            Settings.ACTION_APP_NOTIFICATION_SETTINGS
                         } else {
-                            Settings.ACTION_APPLICATION_DETAILS_SETTINGS // Uygulama Detayları (Konum için)
+                            Settings.ACTION_APPLICATION_DETAILS_SETTINGS
                         }
-
-                        context.openAppSettings(action)
+                        openAppSettings(action)
                         showSettingsRedirectDialog = null
                     }) {
                         Text("AYARLARA GİT", color = PrimaryColor, fontWeight = FontWeight.Bold)
@@ -209,6 +238,7 @@ fun SettingsScreen(viewModel: HomeViewModel) {
     }
 }
 
+// Yardımcı Composable'lar (Aynı dosyada veya ayrı dosyada tutabilirsiniz)
 @Composable
 fun SectionHeader(text: String) {
     Text(
@@ -216,7 +246,7 @@ fun SectionHeader(text: String) {
         style = MaterialTheme.typography.labelSmall,
         color = PrimaryColor,
         fontWeight = FontWeight.Bold,
-        modifier = Modifier.padding(start = 4.dp, bottom = 4.dp)
+        modifier = Modifier.padding(start = 4.dp, bottom = 4.dp, top = 8.dp)
     )
 }
 
@@ -230,8 +260,7 @@ fun SettingsItem(
 ) {
     GlassCard(modifier = Modifier.fillMaxWidth()) {
         Row(
-            modifier = Modifier
-                .padding(16.dp),
+            modifier = Modifier.padding(16.dp),
             verticalAlignment = Alignment.CenterVertically
         ) {
             Icon(icon, null, tint = if(isChecked) PrimaryColor else Color.Gray)
@@ -240,9 +269,6 @@ fun SettingsItem(
                 Text(title, color = Color.White, style = MaterialTheme.typography.titleSmall)
                 Text(subtitle, color = Color.Gray, style = MaterialTheme.typography.bodySmall)
             }
-            // Switch yerine tıklanabilir bir durum göstergesi kullanıyoruz
-            // Ancak kullanıcı "switch" gibi hissetsin diye Switch componentini koruyoruz
-            // Fakat Switch'in kendi toggle animasyonunu, permission state yönetiyor.
             Switch(
                 checked = isChecked,
                 onCheckedChange = onCheckedChange,

@@ -60,6 +60,7 @@ import com.google.android.gms.maps.model.MapStyleOptions
 import com.google.maps.android.compose.Circle
 import com.google.maps.android.compose.GoogleMap
 import com.google.maps.android.compose.MapProperties
+import com.google.maps.android.compose.MapType
 import com.google.maps.android.compose.MapUiSettings
 import com.google.maps.android.compose.Marker
 import com.google.maps.android.compose.MarkerState
@@ -91,6 +92,7 @@ fun MapScreen(
 
     val cameraPositionState = rememberCameraPositionState()
     val scope = rememberCoroutineScope()
+    val mapStyleConfig by viewModel.currentMapStyle.collectAsState()
 
     var userLocation by remember { mutableStateOf<Location?>(null) }
     var showNoTargetDialog by remember { mutableStateOf(false) }
@@ -102,7 +104,15 @@ fun MapScreen(
         )
     }
 
-    // --- AKSİYON TANIMLARI (BURASI YENİ) ---
+    val mapProperties = remember(mapStyleConfig) {
+        MapProperties(
+            isMyLocationEnabled = hasLocationPermission,
+            mapType = mapStyleConfig.mapType,
+            mapStyleOptions = mapStyleConfig.jsonResId?.let {
+                MapStyleOptions.loadRawResourceStyle(context, it)
+            }
+        )
+    }
 
     // 1. BAŞLAT/DURDUR İÇİN GÜVENLİ TIKLAMA
     val onToggleClick = rememberPermissionAction(
@@ -164,14 +174,7 @@ fun MapScreen(
         GoogleMap(
             modifier = Modifier.fillMaxSize(),
             cameraPositionState = cameraPositionState,
-            properties = MapProperties(
-                isMyLocationEnabled = hasLocationPermission,
-                mapStyleOptions = try {
-                    MapStyleOptions.loadRawResourceStyle(context, R.raw.map_style_dark)
-                } catch (e: Resources.NotFoundException) {
-                    null
-                }
-            ),
+            properties = mapProperties,
             uiSettings = MapUiSettings(
                 zoomControlsEnabled = false,
                 compassEnabled = false,

@@ -45,6 +45,7 @@ import com.google.android.gms.location.LocationServices
 import com.google.android.gms.maps.CameraUpdateFactory
 import com.google.android.gms.maps.model.CameraPosition
 import com.google.android.gms.maps.model.LatLng
+import com.google.android.gms.maps.model.MapStyleOptions
 import com.google.maps.android.compose.*
 import com.vahitkeskin.targetping.ui.home.HomeViewModel
 import kotlinx.coroutines.Dispatchers
@@ -64,6 +65,7 @@ fun AddEditScreen(
     val density = LocalDensity.current
     val targets by viewModel.targets.collectAsState()
     val scope = rememberCoroutineScope()
+    val mapStyleConfig by viewModel.currentMapStyle.collectAsState()
 
     // State'ler
     val existingTarget = remember(targetId, targets) { targets.find { it.id == targetId } }
@@ -87,6 +89,16 @@ fun AddEditScreen(
 
     val cameraPositionState = rememberCameraPositionState {
         position = CameraPosition.fromLatLngZoom(initialPos, 16f)
+    }
+
+    val mapProperties = remember(mapStyleConfig) {
+        MapProperties(
+            isMyLocationEnabled = hasLocationPermission,
+            mapType = mapStyleConfig.mapType,
+            mapStyleOptions = mapStyleConfig.jsonResId?.let {
+                MapStyleOptions.loadRawResourceStyle(context, it)
+            }
+        )
     }
 
     // --- AUTO FOCUS ---
@@ -203,10 +215,7 @@ fun AddEditScreen(
                 modifier = Modifier.fillMaxSize(),
                 cameraPositionState = cameraPositionState,
                 contentPadding = PaddingValues(bottom = bottomPanelHeight),
-                properties = MapProperties(
-                    isMyLocationEnabled = hasLocationPermission,
-                    mapType = MapType.HYBRID
-                ),
+                properties = mapProperties,
                 uiSettings = MapUiSettings(
                     zoomControlsEnabled = false,
                     compassEnabled = false,
