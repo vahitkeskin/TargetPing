@@ -5,6 +5,8 @@ import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.rounded.*
 import androidx.compose.material3.*
@@ -17,7 +19,9 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.vahitkeskin.targetping.data.local.entity.LogEntity
 import com.vahitkeskin.targetping.data.local.entity.LogEventType
-import com.vahitkeskin.targetping.ui.features.add_edit.GlassCard
+import androidx.compose.ui.text.buildAnnotatedString
+import androidx.compose.ui.text.withStyle
+import androidx.compose.ui.text.SpanStyle
 import com.vahitkeskin.targetping.ui.home.HomeViewModel
 import java.text.SimpleDateFormat
 import java.util.*
@@ -107,84 +111,168 @@ fun ActivityLogScreen(viewModel: HomeViewModel) {
 @Composable
 fun LogItemCard(log: LogEntity) {
     val isEntry = log.eventType == LogEventType.ENTRY
-    val iconColor = if (isEntry) PrimaryColor else AlertRed
+    val statusColor = when (log.eventType) {
+        LogEventType.ENTRY -> PrimaryColor
+        LogEventType.EXIT -> AlertRed
+        else -> Color(0xFFFFC107)
+    }
+
     val icon = if (isEntry) Icons.Rounded.Login else Icons.Rounded.Logout
 
-    // Tarih Formatlama
-    val dateFormat = remember { SimpleDateFormat("HH:mm:ss", Locale.getDefault()) }
-    val dateString = remember(log.timestamp) { dateFormat.format(Date(log.timestamp)) }
-    val fullDate = remember { SimpleDateFormat("dd MMM yyyy", Locale.getDefault()).format(Date(log.timestamp)) }
+    // Formatlayıcılar
+    val timeFormat = remember { SimpleDateFormat("HH:mm", Locale.getDefault()) }
+    val secondsFormat =
+        remember { SimpleDateFormat(":ss", Locale.getDefault()) } // ':' başa eklendi
+    val dateFormat = remember { SimpleDateFormat("dd.MM.yyyy", Locale.getDefault()) }
 
-    GlassCard(modifier = Modifier.fillMaxWidth()) {
-        Row(
-            modifier = Modifier
-                .padding(16.dp)
-                .fillMaxWidth(),
-            verticalAlignment = Alignment.CenterVertically
-        ) {
-            // 1. ZAMAN DAMGASI (Sol Taraf)
-            Column(
-                horizontalAlignment = Alignment.CenterHorizontally,
-                modifier = Modifier.width(60.dp)
-            ) {
-                Text(
-                    text = dateString,
-                    color = Color.White,
-                    fontWeight = FontWeight.Bold,
-                    style = MaterialTheme.typography.titleMedium
-                )
-                Text(
-                    text = fullDate,
-                    color = Color.Gray,
-                    style = MaterialTheme.typography.labelSmall,
-                    fontSize = 8.sp
-                )
-            }
+    val date = Date(log.timestamp)
+    val timeStr = remember(log.timestamp) { timeFormat.format(date) }
+    val secondsStr = remember(log.timestamp) { secondsFormat.format(date) }
+    val dateStr = remember(log.timestamp) { dateFormat.format(date) }
 
-            // Dikey Çizgi
-            Divider(
+    Card(
+        modifier = Modifier
+            .fillMaxWidth()
+            .height(80.dp),
+        shape = RoundedCornerShape(12.dp),
+        colors = CardDefaults.cardColors(
+            containerColor = Color(0xFF1E1E1E).copy(alpha = 0.6f)
+        ),
+        border = androidx.compose.foundation.BorderStroke(1.dp, Color.White.copy(alpha = 0.05f))
+    ) {
+        Row(modifier = Modifier.fillMaxSize()) {
+
+            // 1. SOL STATUS ÇUBUĞU
+            Box(
                 modifier = Modifier
-                    .height(40.dp)
-                    .padding(horizontal = 12.dp)
-                    .width(1.dp),
-                color = Color.White.copy(alpha = 0.1f)
+                    .fillMaxHeight()
+                    .width(6.dp)
+                    .background(statusColor)
             )
 
-            // 2. İKON VE DETAY (Orta ve Sağ)
-            Column(modifier = Modifier.weight(1f)) {
-                Row(verticalAlignment = Alignment.CenterVertically) {
+            // 2. İÇERİK
+            Row(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .padding(end = 12.dp),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+
+                // --- KESİN ÇÖZÜM ALANI ---
+                Column(
+                    modifier = Modifier
+                        .width(88.dp) // Genişlik optimize edildi (88dp idealdir)
+                        .fillMaxHeight()
+                        .padding(start = 10.dp), // İç boşluk biraz kısıldı
+                    verticalArrangement = Arrangement.Center,
+                    horizontalAlignment = Alignment.Start
+                ) {
+                    // TEK TEXT İÇİNDE STİL AYRIŞTIRMA (SpanStyle)
+                    // Bu yöntem kaymayı %100 engeller.
                     Text(
-                        text = if (isEntry) "BÖLGEYE GİRİŞ" else "BÖLGEDEN ÇIKIŞ",
-                        color = iconColor,
-                        style = MaterialTheme.typography.labelSmall,
-                        fontWeight = FontWeight.Bold
+                        text = buildAnnotatedString {
+                            // Saat Kısmı (Büyük ve Beyaz)
+                            withStyle(
+                                style = SpanStyle(
+                                    color = Color.White,
+                                    fontSize = 16.sp,
+                                    fontWeight = FontWeight.Bold,
+                                    fontFamily = androidx.compose.ui.text.font.FontFamily.Monospace,
+                                    letterSpacing = (-0.5).sp
+                                )
+                            ) {
+                                append(timeStr)
+                            }
+                            // Saniye Kısmı (Küçük ve Gri)
+                            withStyle(
+                                style = SpanStyle(
+                                    color = Color.Gray,
+                                    fontSize = 12.sp,
+                                    fontFamily = androidx.compose.ui.text.font.FontFamily.Monospace
+                                )
+                            ) {
+                                append(secondsStr)
+                            }
+                        },
+                        maxLines = 1,
+                        softWrap = false // Alt satıra geçmeyi yasaklar
                     )
-                    Spacer(Modifier.width(4.dp))
-                    if (log.eventType == LogEventType.SYSTEM) {
-                        Text("(SİSTEM)", color = Color.Gray, style = MaterialTheme.typography.labelSmall)
+
+                    // Tarih
+                    Text(
+                        text = dateStr,
+                        style = MaterialTheme.typography.labelSmall.copy(
+                            fontFamily = androidx.compose.ui.text.font.FontFamily.Monospace,
+                            fontSize = 10.sp
+                        ),
+                        color = Color.Gray.copy(alpha = 0.6f),
+                        maxLines = 1,
+                        softWrap = false
+                    )
+                }
+
+                // Dikey Ayırıcı
+                Divider(
+                    modifier = Modifier
+                        .padding(horizontal = 8.dp)
+                        .height(32.dp)
+                        .width(1.dp),
+                    color = Color.White.copy(alpha = 0.1f)
+                )
+
+                // ORTA BİLGİ
+                Column(
+                    modifier = Modifier.weight(1f),
+                    verticalArrangement = Arrangement.Center
+                ) {
+                    Text(
+                        text = log.targetName,
+                        style = MaterialTheme.typography.titleSmall.copy(
+                            fontWeight = FontWeight.SemiBold
+                        ),
+                        color = Color.White,
+                        maxLines = 1,
+                        overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis
+                    )
+
+                    Spacer(Modifier.height(4.dp))
+
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Text(
+                            text = if (isEntry) "ERİŞİM İZNİ" else "BAĞLANTI KESİLDİ",
+                            style = MaterialTheme.typography.labelSmall.copy(
+                                fontSize = 9.sp,
+                                fontWeight = FontWeight.Bold
+                            ),
+                            color = statusColor
+                        )
+                        Spacer(Modifier.width(8.dp))
+                        Text(
+                            text = "#${log.id}",
+                            style = MaterialTheme.typography.labelSmall.copy(
+                                fontFamily = androidx.compose.ui.text.font.FontFamily.Monospace,
+                                fontSize = 9.sp
+                            ),
+                            color = Color.Gray
+                        )
                     }
                 }
 
-                Spacer(Modifier.height(2.dp))
-
-                Text(
-                    text = log.targetName,
-                    color = Color.White,
-                    style = MaterialTheme.typography.bodyMedium,
-                    maxLines = 1
-                )
+                // SAĞ İKON
+                Box(
+                    modifier = Modifier
+                        .size(32.dp)
+                        .background(statusColor.copy(alpha = 0.15f), CircleShape),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Icon(
+                        imageVector = icon,
+                        contentDescription = null,
+                        tint = statusColor,
+                        modifier = Modifier.size(16.dp)
+                    )
+                }
             }
-
-            // Durum İkonu
-            Icon(
-                imageVector = icon,
-                contentDescription = null,
-                tint = iconColor,
-                modifier = Modifier
-                    .size(32.dp)
-                    .background(iconColor.copy(alpha = 0.1f), shape = MaterialTheme.shapes.small)
-                    .padding(4.dp)
-            )
         }
     }
 }
