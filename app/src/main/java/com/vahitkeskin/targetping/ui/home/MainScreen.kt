@@ -148,6 +148,7 @@ fun DashboardScreen(
                         onNavigateToAdd = { _ -> onNavigateToAdd(null) }
                     )
                 }
+
                 1 -> {
                     // TargetsListScreen -> Altına Padding Eklendi
                     Box(
@@ -162,6 +163,7 @@ fun DashboardScreen(
                         )
                     }
                 }
+
                 2 -> {
                     // ActivityLogScreen -> Altına Padding Eklendi
                     Box(
@@ -172,6 +174,7 @@ fun DashboardScreen(
                         ActivityLogScreen(viewModel)
                     }
                 }
+
                 3 -> {
                     // SettingsScreen -> Altına Padding Eklendi
                     Box(
@@ -208,7 +211,7 @@ fun GlassBottomNavigation(
         modifier = modifier
             .fillMaxWidth()
             .windowInsetsPadding(WindowInsets.navigationBars)
-            .padding(start = 16.dp, end = 16.dp, bottom = 24.dp)
+            .padding(horizontal = 16.dp)
             .height(80.dp)
             .clip(RoundedCornerShape(40.dp))
             .background(SurfaceColor.copy(alpha = 0.95f))
