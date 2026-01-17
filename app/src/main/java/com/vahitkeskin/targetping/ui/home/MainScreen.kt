@@ -56,6 +56,7 @@ import com.vahitkeskin.targetping.ui.navigation.Screen
 import com.vahitkeskin.targetping.ui.theme.PrimaryColor
 import com.vahitkeskin.targetping.ui.theme.SurfaceColor
 import kotlinx.coroutines.launch
+import androidx.compose.foundation.layout.asPaddingValues
 
 @Composable
 fun MainScreen(
@@ -125,6 +126,10 @@ fun DashboardScreen(
     // Harita sayfasında (0) swipe'ı engelle, diğerlerinde serbest bırak
     val isScrollEnabled = pagerState.currentPage != 0
 
+    // Bottom Navigation'ın kapladığı toplam alan:
+    val navBarInsets = WindowInsets.navigationBars.asPaddingValues()
+    val safeBottomPadding = navBarInsets.calculateBottomPadding()
+
     Box(modifier = Modifier.fillMaxSize()) {
         // 1. İÇERİK (Pager)
         HorizontalPager(
@@ -134,24 +139,49 @@ fun DashboardScreen(
         ) { page ->
             when (page) {
                 0 -> {
-                    // İZİN LOJİKLERİ BURADA (MapScreen içinde) KORUNUYOR
+                    // Harita TAM EKRAN kalmalı, çünkü arkada görünmesi güzel durur.
+                    // Google Maps içindeki UI (zoom butonları vs) için padding gerekirse
+                    // MapScreen'in içine parametre olarak gönderilebilir ama
+                    // genel akışta haritanın glass bar arkasında olması istenir.
                     MapScreen(
                         viewModel = viewModel,
                         onNavigateToAdd = { _ -> onNavigateToAdd(null) }
                     )
                 }
                 1 -> {
-                    Box(modifier = Modifier.fillMaxSize()) {
+                    // TargetsListScreen -> Altına Padding Eklendi
+                    Box(
+                        modifier = Modifier
+                            .fillMaxSize()
+                            .padding(bottom = safeBottomPadding) // <--- KRİTİK NOKTA
+                    ) {
                         TargetsListScreen(
                             viewModel = viewModel,
-                            // Işınlanma (Animasyonsuz geçiş)
                             onNavigateToMap = { scope.launch { pagerState.scrollToPage(0) } },
                             onEditTarget = { target -> onNavigateToAdd(target.id) }
                         )
                     }
                 }
-                2 -> ActivityLogScreen(viewModel)
-                3 -> SettingsScreen(viewModel)
+                2 -> {
+                    // ActivityLogScreen -> Altına Padding Eklendi
+                    Box(
+                        modifier = Modifier
+                            .fillMaxSize()
+                            .padding(bottom = safeBottomPadding) // <--- KRİTİK NOKTA
+                    ) {
+                        ActivityLogScreen(viewModel)
+                    }
+                }
+                3 -> {
+                    // SettingsScreen -> Altına Padding Eklendi
+                    Box(
+                        modifier = Modifier
+                            .fillMaxSize()
+                            .padding(bottom = safeBottomPadding) // <--- KRİTİK NOKTA
+                    ) {
+                        SettingsScreen(viewModel)
+                    }
+                }
             }
         }
 
@@ -161,7 +191,6 @@ fun DashboardScreen(
             currentPage = pagerState.currentPage,
             onTabSelected = { index ->
                 scope.launch {
-                    // Doğrudan geçiş (Animasyonsuz/Işınlanma)
                     pagerState.scrollToPage(index)
                 }
             }
